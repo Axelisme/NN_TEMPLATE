@@ -2,16 +2,20 @@
 """some tools for the project"""
 
 import torch
-from torch import Tensor
-import torch.nn.functional as F
+import numpy as np
+import random
+from torch.backends import cudnn
 
-def loss_func(output: Tensor , label: Tensor) -> Tensor:
-    """loss function"""
-    return torch.zeros(label.size(0), dtype=torch.float32)
-
-def score_func(output: Tensor , label: Tensor) -> Tensor:
-    """score function"""
-    return torch.zeros(label.size(0), dtype=torch.float32)
+def set_seed(seed: int) -> None:
+    """set seed for reproducibility"""
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    cudnn.deterministic = True
+    cudnn.benchmark = False
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
