@@ -1,5 +1,5 @@
 
-"""global variables"""
+"""path to different directories"""
 
 from os import path
 

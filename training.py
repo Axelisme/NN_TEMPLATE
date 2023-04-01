@@ -1,16 +1,17 @@
 
 """A script to train a model on the train dataset."""
 
-import config.global_variables as gv
+import config.path as p
 import util.utility as ul
-from model.model import WaveFuncTrans
+from model.model import Model
+from dataset.dataset import Dataset
 from trainer.trainer import Trainer
+from evaluator.fl_score import F1Score
 import torch
 from torch import nn
 from torch.optim import AdamW
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
-from torch.utils.data import Dataset
 
 def main():
     """Main function of the script."""
@@ -19,33 +20,33 @@ def main():
     ul.set_seed(seed=seed)
 
     # create model and variables
-    model:nn.Module = WaveFuncTrans()
+    model = Model()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    epochs:int = 10
-    batch_size:int = 32
-    learning_rate:float = 0.001
+    epochs = 10
+    batch_size = 32
+    learning_rate = 0.001
     optimizer = AdamW(model.parameters(), lr=learning_rate)
-    warmup_ratio:float = 0.95
+    warmup_ratio = 0.95
     scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=warmup_ratio)
-    criterion:nn.Module = nn.MSELoss()
-    score:nn.Module = nn.MSELoss()
+    criterion = nn.MSELoss()
+    score = F1Score()
 
     # create dataloader
-    train_set:Dataset = Dataset()
-    valid_set:Dataset = Dataset()
+    train_set:Dataset = Dataset("train")
+    valid_set:Dataset = Dataset("valid")
     train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, pin_memory=True)
     valid_loader = DataLoader(valid_set, batch_size=batch_size, shuffle=False, pin_memory=True)
 
     # create trainer
-    trainer:Trainer = Trainer(model,
-                              device,
-                              train_loader,
-                              valid_loader,
-                              epochs,
-                              scheduler,
-                              optimizer,
-                              criterion,
-                              score)
+    trainer = Trainer(model,
+                      device,
+                      train_loader,
+                      valid_loader,
+                      epochs,
+                      scheduler,
+                      optimizer,
+                      criterion,
+                      score)
 
     # start training
     print('Training model...')

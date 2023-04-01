@@ -1,11 +1,11 @@
 
-"""A complex CNN model for the QINN dataset."""
+"""A neural network model."""
 
 from torch import nn
 
-class WaveFuncTrans(nn.Module):
+class Model(nn.Module):
     def __init__(self):
-        super(WaveFuncTrans, self).__init__()
+        super(Model, self).__init__()
 
     def forward(self, x):
         return x

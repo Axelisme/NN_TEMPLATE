@@ -6,6 +6,7 @@ import torch
 from torch import nn
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
+from evaluator.eval_abc import Evaluator
 from tqdm.auto import tqdm
 import typing as t
 
@@ -20,7 +21,7 @@ class Trainer:
                  scheduler,
                  optimizer: Optimizer,
                  criterion: nn.Module,
-                 score: nn.Module ) -> None:
+                 score: Evaluator) -> None:
         self.model = model
         self.device = device
         self.train_loader = train_loader
@@ -80,7 +81,7 @@ class Trainer:
                     output = self.model(input)
                     # calculate loss and score
                     loss = self.criterion(output, label)
-                    score = self.score(output, label)
+                    score = self.score.eval(output, label)
                     # update loss and score
                     valid_loss.update(loss.sum().item(), input.size(0))
                     valid_score.update(score.sum().item(), input.size(0))
