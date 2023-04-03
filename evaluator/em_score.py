@@ -1,7 +1,8 @@
 
 """define a class to calculate em score"""
 
-from .eval_abc import Evaluator
+import numpy as np
+from .ABC import Evaluator
 import torch
 from torch import Tensor
 
@@ -10,5 +11,8 @@ class EMScore(Evaluator):
         super(EMScore, self).__init__()
 
     def eval(self, y_pred: Tensor, y_true: Tensor) -> Tensor:
-        return NotImplemented
+        y_pred_:np.ndarray = y_pred.detach().cpu().numpy()
+        y_true_:np.ndarray = y_true.detach().cpu().numpy()
+        y_pred_ = (y_pred_ > 0.5).astype(int)
+        return torch.as_tensor((y_pred_ == y_true_).all())
     

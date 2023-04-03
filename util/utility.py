@@ -33,3 +33,28 @@ class AverageMeter(object):
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
+
+class Result:
+    """handle the training result"""
+    def __init__(self) -> None:
+        self.data = dict()
+
+    def add(self,**result_dict) -> None:
+        """add some result"""
+        for key,value in result_dict.items():
+            if key not in self.data.keys():
+                self.data[key] = list()
+            self.data[key].append(value)
+
+    def shows(self, keylist) -> None:
+        """show the result"""
+        for key in keylist:
+            print(f'{key}: {self.data[key][-1]:.3f}')
+
+    def show(self, key) -> None:
+        """show a result"""
+        print(f'{key}: {self.data[key][-1]:.3f}')
+
+    def get(self, key) -> list:
+        """get a result"""
+        return self.data[key]

@@ -1,9 +1,8 @@
 
 """define a class to test the model"""
 
-import config.path as p
 import util.utility as ul
-from evaluator.eval_abc import Evaluator
+from evaluator.ABC import Evaluator
 import torch
 from torch import nn
 from torch import device
@@ -21,14 +20,15 @@ class Inferencer:
         self.test_loader = test_loader
         self.score = score
     
-    def evaluate(self) -> float:
+    def evaluate(self) -> ul.Result:
         '''test a model on test set'''
         # move model to device
         self.model.to(self.device)
         
         # evaluate this model
         self.model.eval()
-        test_score_average: ul.AverageMeter = ul.AverageMeter()
+        test_result = ul.Result()
+        test_score = ul.AverageMeter()
         with torch.no_grad():
             for input,label in tqdm(self.test_loader):
                 # move input and label to device
@@ -39,10 +39,13 @@ class Inferencer:
                 # calculate score
                 score = self.score.eval(output, label)
                 # update loss and score
-                test_score_average.update(score.sum().item(), input.size(0))
+                test_score.update(score.sum().item(), score.size(0))
+        # store test score
+        test_result.add(score=test_score.avg)
         # print loss and score
-        print(f'test score: {test_score_average.avg}')
+        print('test:')
+        test_result.show('score')
 
         # return score
-        return test_score_average.avg
+        return test_result
 

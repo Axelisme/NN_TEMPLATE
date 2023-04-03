@@ -2,14 +2,14 @@
 """define a class for training a model"""
 
 import util.utility as ul
+from evaluator.ABC import Evaluator
 import torch
 from torch import nn
+from torch import Tensor
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
-from evaluator.eval_abc import Evaluator
 from tqdm.auto import tqdm
-import typing as t
-
+from typing import Tuple
 
 class Trainer:
     def __init__(self,
@@ -21,7 +21,7 @@ class Trainer:
                  scheduler,
                  optimizer: Optimizer,
                  criterion: nn.Module,
-                 score: Evaluator) -> None:
+                 score: Evaluator):
         self.model = model
         self.device = device
         self.train_loader = train_loader
@@ -32,18 +32,17 @@ class Trainer:
         self.criterion = criterion
         self.score = score
 
-    def train(self) -> t.Tuple[t.List[float], t.List[float], t.List[float]]:
+    def train(self) -> Tuple[ul.Result, ul.Result]:
         '''train a model'''
         # move model to device
         self.model.to(self.device)
         # train model
-        train_losses = []
-        valid_losses = []
-        valid_scores = []
+        train_result = ul.Result()
+        valid_result = ul.Result()
         for epoch in range(self.epochs):
             # print epoch
-            print(f'Epoch {epoch+1}/{self.epochs}')
             print('-'*10)
+            print(f'Epoch {epoch+1}/{self.epochs}')
 
             # train for one epoch
             self.model.train()
@@ -53,17 +52,18 @@ class Trainer:
                 input = input.to(self.device)
                 label = label.to(self.device)
                 # forward
-                output = self.model(input)
-                loss = self.criterion(output, label)
-                train_loss.update(loss.sum().item(), input.size(0))
+                output:Tensor = self.model(input)
+                loss:Tensor = self.criterion(output, label)
+                train_loss.update(loss.sum().item(), loss.size(0))
                 # backward
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
-            # print loss
-            print(f'train loss: {train_loss.avg}')
-            # store loss
-            train_losses.append(train_loss.avg)
+            # store training loss
+            train_result.add(loss=train_loss.avg)
+            # show training loss
+            print('Training:')
+            train_result.show('loss')
 
             # update learning rate
             self.scheduler.step()
@@ -82,15 +82,15 @@ class Trainer:
                     # calculate loss and score
                     loss = self.criterion(output, label)
                     score = self.score.eval(output, label)
-                    # update loss and score
-                    valid_loss.update(loss.sum().item(), input.size(0))
-                    valid_score.update(score.sum().item(), input.size(0))
-            # print loss and score
-            print(f'validation loss: {valid_loss.avg}')
-            print(f'validation score: {valid_score.avg}')
-            # store loss and score
-            valid_losses.append(valid_loss.avg)
-            valid_scores.append(valid_score.avg)
+                    # store loss and score
+                    valid_loss.update(loss.sum().item(), loss.size(0))
+                    valid_score.update(score.sum().item(), score.size(0))
+            # store validation loss and score
+            valid_result.add(loss=valid_loss.avg, score=valid_score.avg)
+            # show validation loss and score
+            print('Validation:')
+            valid_result.shows(['loss','score'])
 
-        return train_losses, valid_losses, valid_scores
+
+        return train_result, valid_result
 

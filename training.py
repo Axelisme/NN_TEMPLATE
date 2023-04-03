@@ -16,8 +16,7 @@ from torch.utils.data import DataLoader
 def main():
     """Main function of the script."""
     # set random seed
-    seed:int = 0
-    ul.set_seed(seed=seed)
+    ul.set_seed(0)
 
     # create model and variables
     model = Model()
@@ -50,11 +49,12 @@ def main():
 
     # start training
     print('Training model...')
-    train_result = trainer.train()
+    train_r, valid_r = trainer.train()
     print('Finished training model.')
 
     # save model
-    torch.save(model.state_dict(), gv.SAVED_MODELS_DIR + f'/model_loss_{train_result[0][-1]:.3f}_score_{train_result[2][-1]:.3f}.pt')
+    SAVE_MODEL_PATH = p.SAVED_MODELS_DIR + f"/model_loss_{train_r.get('loss')[-1]:.3f}_score_{valid_r.get('score')[-1]:.3f}.pt"
+    torch.save(model.state_dict(), SAVE_MODEL_PATH)
     
 if __name__ == '__main__':
     main()
