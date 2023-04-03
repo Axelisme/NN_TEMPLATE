@@ -5,6 +5,7 @@ import numpy as np
 from .ABC import Evaluator
 import torch
 from torch import Tensor
+from torch.nn.functional import one_hot
 
 class EMScore(Evaluator):
     def __init__(self):
@@ -12,7 +13,7 @@ class EMScore(Evaluator):
 
     def eval(self, y_pred: Tensor, y_true: Tensor) -> Tensor:
         y_pred_:np.ndarray = y_pred.detach().cpu().numpy()
-        y_true_:np.ndarray = y_true.detach().cpu().numpy()
         y_pred_ = (y_pred_ > 0.5).astype(int)
-        return torch.as_tensor((y_pred_ == y_true_).all())
+        y_true_:np.ndarray = one_hot(y_true.detach(), num_classes=y_pred_.shape[1]).detach().cpu().numpy()
+        return torch.as_tensor((y_pred_ == y_true_).all(1).sum() / y_true_.shape[0])
     

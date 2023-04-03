@@ -1,13 +1,13 @@
 
 """some tools for the project"""
 
-import torch
-import numpy as np
-import random
-from torch.backends import cudnn
-
 def set_seed(seed: int) -> None:
     """set seed for reproducibility"""
+    import torch
+    from torch.backends import cudnn
+    import random
+    import numpy as np
+
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
@@ -55,6 +55,27 @@ class Result:
         """show a result"""
         print(f'{key}: {self.data[key][-1]:.3f}')
 
-    def get(self, key) -> list:
+    def __getitem__(self, key) -> list:
         """get a result"""
         return self.data[key]
+
+    def save(self, path: str) -> None:
+        """save the result"""
+        import pandas as pd
+        df = pd.DataFrame(self.data)
+        df.to_csv(path,index=False)
+
+    def load(self, path: str) -> None:
+        """load the result"""
+        import pandas as pd
+        df = pd.read_csv(path)
+        self.data = df.to_dict('list')
+
+    def plot(self) -> None:
+        """plot the result"""
+        import matplotlib.pyplot as plt
+        plt.figure()
+        for key in self.data.keys():
+            plt.plot(self.data[key], label=key)
+        plt.legend()
+        plt.show()

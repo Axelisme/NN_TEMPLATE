@@ -39,7 +39,7 @@ class Inferencer:
                 # calculate score
                 score = self.score.eval(output, label)
                 # update loss and score
-                test_score.update(score.sum().item(), score.size(0))
+                test_score.update(score.item())
         # store test score
         test_result.add(score=test_score.avg)
         # print loss and score
