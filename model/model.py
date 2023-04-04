@@ -2,6 +2,7 @@
 """A neural network model."""
 
 from torch import nn
+from torch import Tensor
 from torch.nn import functional as F
 
 class Model(nn.Module):
@@ -12,7 +13,7 @@ class Model(nn.Module):
         self.flaten = nn.Flatten()
         self.fc1 = nn.Linear(4*4*32, 10)
 
-    def forward(self, x):
+    def forward(self, x:Tensor) -> Tensor:
         x = self.conv1(x)
         x = nn.functional.relu(x)
         x = self.conv2(x)

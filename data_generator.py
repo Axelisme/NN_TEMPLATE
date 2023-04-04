@@ -1,7 +1,7 @@
 
 """A script to generate data for the project."""
 
-import config.path as p
+import global.path as p
 import util.utility as ul
 
 def main():

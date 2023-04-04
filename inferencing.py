@@ -2,35 +2,51 @@
 """A script to run inference on a trained model."""
 
 from sys import argv
-import config.path as p
+import global_var.path as p
 import util.utility as ul
 from model.model import Model
 from dataset.dataset import DataSet
-from inferencer.inferencer import Inferencer
-from evaluator.fl_score import F1Score
+from config.config import Config
+from tester.tester import Tester
+from evaluator.em_score import EMScore
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
 def main(model_path: str) -> None:
-    """main function of inference.py"""
-    # load the model
-    model:Model = Model()
-    model.load_state_dict(torch.load(model_path))
+    """Main function of the script."""
+    # set random seed
+    seed = 0
+    ul.set_seed(seed)
 
-    # create variables for the inferencer
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    score = F1Score()
+    # create model and variables
+    model = Model()
+    config = Config(
+        seed=seed,
+        model_name='model',
+        device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
+        batch_size=8,
+        SAVE=False
+    )
+    evaluator = EMScore()
 
-    # create data loader
-    test_set = DataSet("test")
-    test_loader = DataLoader(test_set, batch_size=1, shuffle=False, pin_memory=True)
+    # load model
+    model.load_state_dict(torch.load(model_path, map_location=config.device))
 
-    # create inferencer
-    inferencer = Inferencer(model, device, test_loader, score)
+    # create dataloader
+    test_set:DataSet = DataSet("test")
+    test_loader = DataLoader(test_set, batch_size=config.batch_size, shuffle=False, pin_memory=True)
 
-    # evaluate the model
-    inferencer.evaluate()
+    # create trainer
+    tester = Tester(model=model, config=config, test_loader=test_loader, evaluators={type(evaluator).__name__:evaluator})
+
+    # start testing
+    result:dict = tester.eval()
+
+    # print result
+    print("Result:")
+    for name,score in result.items():
+        print(f'{name}: {score:.3f}')
 
 if __name__ == '__main__':
     # print version information
@@ -38,8 +54,18 @@ if __name__ == '__main__':
     print(f'Data discription: ')
     DataSet.discription()
 
-    # start inference
+    # find the save model path
+    save_model_path = ''
     if len(argv) == 2:
         main(argv[1])
     else:
-        main('data/saved_models/model_loss_0.001_score_0.929.pt')
+        import os
+        all_model = os.listdir(p.SAVED_MODELS_DIR)
+        if '.gitkeep' in all_model:
+            all_model.remove('.gitkeep')
+        if len(all_model) == 0:
+            raise Exception("No model found in saved_models directory.")
+        save_model_path = os.path.join(p.SAVED_MODELS_DIR,all_model[0]) 
+
+    # run main function
+    main(save_model_path)

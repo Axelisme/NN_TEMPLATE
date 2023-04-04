@@ -1,7 +1,7 @@
 
 """define a class for the dataset"""
 
-import config.path as p
+import global_var.path as p
 import util.utility as ul
 import torch
 import torch.utils.data as data

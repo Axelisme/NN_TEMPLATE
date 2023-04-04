@@ -17,18 +17,21 @@ def set_seed(seed: int) -> None:
     cudnn.deterministic = True
     cudnn.benchmark = False
 
-class AverageMeter(object):
+class Statistic():
     """Computes and stores the average and current value"""
     def __init__(self):
         self.reset()
 
     def reset(self):
+        """reset the value"""
         self.val = 0
         self.avg = 0
         self.sum = 0
         self.count = 0
 
     def update(self, val, n=1):
+        """update the value:
+        input: the value to update, the number of the value"""
         self.val = val
         self.sum += val * n
         self.count += n
@@ -36,46 +39,38 @@ class AverageMeter(object):
 
 class Result:
     """handle the training result"""
-    def __init__(self) -> None:
-        self.data = dict()
+    def __init__(self, results:dict = {}) -> None:
+        """input: a dict of result, key is the name of the result, value is the result or a list of result"""
+        self.data:dict = dict()
+        self.add(results)
 
-    def add(self,**result_dict) -> None:
-        """add some result"""
-        for key,value in result_dict.items():
+    def add(self,results:dict) -> None:
+        """add a result:
+        input: a dict of result, key is the name of the result, value is the result or a list of result"""
+        for key,value in results.items():
             if key not in self.data.keys():
                 self.data[key] = list()
-            self.data[key].append(value)
-
-    def shows(self, keylist) -> None:
-        """show the result"""
-        for key in keylist:
-            print(f'{key}: {self.data[key][-1]:.3f}')
-
-    def show(self, key) -> None:
-        """show a result"""
-        print(f'{key}: {self.data[key][-1]:.3f}')
+            if isinstance(value, list):
+                self.data[key].extend(value)
+            else:
+                self.data[key].append(value)
 
     def __getitem__(self, key) -> list:
-        """get a result"""
+        """get a result:
+        input: the name of the result,
+        output: a list of result"""
         return self.data[key]
 
     def save(self, path: str) -> None:
-        """save the result"""
+        """save the result to a csv file:
+        input: the path to save the result"""
         import pandas as pd
         df = pd.DataFrame(self.data)
         df.to_csv(path,index=False)
 
     def load(self, path: str) -> None:
-        """load the result"""
+        """load the result from a csv file:
+        input: the path to load the result"""
         import pandas as pd
         df = pd.read_csv(path)
         self.data = df.to_dict('list')
-
-    def plot(self) -> None:
-        """plot the result"""
-        import matplotlib.pyplot as plt
-        plt.figure()
-        for key in self.data.keys():
-            plt.plot(self.data[key], label=key)
-        plt.legend()
-        plt.show()
