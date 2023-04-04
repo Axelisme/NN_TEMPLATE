@@ -4,14 +4,16 @@
 from sys import argv
 import global_var.path as p
 import util.utility as ul
-from model.model import Model
-from dataset.dataset import DataSet
+from model.model import MyModel
+from dataset.dataset import MyDataSet
 from config.config import Config
 from tester.tester import Tester
 from evaluator.em_score import EMScore
 import torch
 from torch import nn
+import torch.utils.data as data
 from torch.utils.data import DataLoader
+
 
 def main(model_path: str) -> None:
     """Main function of the script."""
@@ -20,7 +22,7 @@ def main(model_path: str) -> None:
     ul.set_seed(seed)
 
     # create model and variables
-    model = Model()
+    model = MyModel()
     config = Config(
         seed=seed,
         model_name='model',
@@ -28,13 +30,14 @@ def main(model_path: str) -> None:
         batch_size=8,
         SAVE=False
     )
+    dataset = MyDataSet
     evaluator = EMScore()
 
     # load model
     model.load_state_dict(torch.load(model_path, map_location=config.device))
 
     # create dataloader
-    test_set:DataSet = DataSet("test")
+    test_set:data.Dataset = dataset("test")
     test_loader = DataLoader(test_set, batch_size=config.batch_size, shuffle=False, pin_memory=True)
 
     # create trainer
@@ -53,7 +56,7 @@ if __name__ == '__main__':
     # print version information
     print(f'Torch version: {torch.__version__}')
     print(f'Data discription: ')
-    DataSet.discription()
+    MyDataSet.discription()
 
     # find the save model path
     save_model_path = ''

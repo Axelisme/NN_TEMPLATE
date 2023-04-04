@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from sklearn.datasets import load_digits
 from sklearn.model_selection import train_test_split
 
-class DataSet(data.Dataset):
+class MyDataSet(data.Dataset):
     """define a class for the dataset"""
     Data = load_digits()
     train_data, test_data, train_label, test_label = train_test_split(Data.data, Data.target, test_size=0.2, random_state=0)

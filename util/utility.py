@@ -42,9 +42,9 @@ class Result:
     def __init__(self, results:dict = {}) -> None:
         """input: a dict of result, key is the name of the result, value is the result or a list of result"""
         self.data:dict = dict()
-        self.add(results)
+        self.log(results)
 
-    def add(self,results:dict) -> None:
+    def log(self,results:dict) -> None:
         """add a result:
         input: a dict of result, key is the name of the result, value is the result or a list of result"""
         for key,value in results.items():

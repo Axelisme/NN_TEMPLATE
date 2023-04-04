@@ -5,10 +5,10 @@ from torch import nn
 from torch import Tensor
 from torch.nn import functional as F
 
-class Model(nn.Module):
+class MyModel(nn.Module):
     def __init__(self):
         """Initialize a neural network model."""
-        super(Model, self).__init__()
+        super(MyModel, self).__init__()
         self.conv1 = nn.Conv2d(1, 16, 3, 1)
         self.conv2 = nn.Conv2d(16, 32, 3, 1)
         self.flaten = nn.Flatten()
