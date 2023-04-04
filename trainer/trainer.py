@@ -40,15 +40,15 @@ class Trainer:
         
         # train for one epoch
         train_loss = ul.Statistic()
-        for idx,(input,label) in enumerate(tqdm(self.train_loader)):
+        for batch_idx,(input,label) in enumerate(tqdm(self.train_loader)):
             # move input and label to device
             input:Tensor = input.to(self.config.device)
             label:Tensor = label.to(self.config.device)
             # forward
+            self.optimizer.zero_grad()
             output:Tensor = self.model(input)
             loss:Tensor = self.criterion(output, label)
             # backward
-            self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
             # store loss

@@ -74,3 +74,11 @@ class Result:
         import pandas as pd
         df = pd.read_csv(path)
         self.data = df.to_dict('list')
+
+    def plot(self) -> None:
+        """plot the result"""
+        import matplotlib.pyplot as plt
+        for key in self.data.keys():
+            plt.plot(self.data[key], label=key)
+        plt.legend()
+        plt.show()

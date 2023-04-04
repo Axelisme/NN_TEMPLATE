@@ -18,3 +18,8 @@ class Config:
             super().__setattr__(name, value)
         else:
             self.data[name] = value
+
+    def to_wandb(self) -> None:
+        """add the config to wandb"""
+        import wandb
+        wandb.config.update(self.data)
