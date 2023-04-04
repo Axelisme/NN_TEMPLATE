@@ -14,15 +14,27 @@ class Tester:
     def __init__(self,
                  model: nn.Module,
                  config: Config,
-                 test_loader: DataLoader,
-                 evaluators: Dict[str,Evaluator]) -> None:
+                 test_loader: DataLoader) -> None:
+        '''initialize a tester:
+        input: model: nn.Module, the model to test,
+               config: Config, the config of this model,
+               test_loader: DataLoader, the dataloader of test set'''
         self.model = model
         self.config = config
         self.test_loader = test_loader
-        self.evaluators = evaluators
+        self.evaluators = dict()
     
+    def add_evaluator(self, evaluator: Evaluator, name: str|None = None) -> None:
+        '''add an evaluator to this tester:
+        input: evaluator: Evaluator, the evaluator to add,
+               name: str|None = None, the name of this evaluator'''
+        if name is None:
+            name = type(evaluator).__name__
+        self.evaluators[name] = evaluator
+
     def eval(self) -> dict:
-        '''test a model on test set'''
+        '''test a model on test set:
+        output: dict(evaluator name, score), the result of this model'''
         # move model to device
         self.model.to(self.config.device)
         

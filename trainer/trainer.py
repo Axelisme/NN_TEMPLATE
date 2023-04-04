@@ -17,6 +17,12 @@ class Trainer:
                  train_loader: DataLoader,
                  optimizer: Optimizer,
                  criterion: nn.Module):
+        '''initialize a trainer:
+        input: model: nn.Module, the model to train,
+                config: Config, the config of this model,
+                train_loader: DataLoader, the dataloader of train set,
+                optimizer: Optimizer, the optimizer of this model,
+                criterion: nn.Module, the criterion of this model'''
         self.model = model
         self.config = config
         self.train_loader = train_loader
@@ -24,7 +30,8 @@ class Trainer:
         self.criterion = criterion
 
     def train(self) -> dict:
-        '''train a model'''
+        '''train a model for one epoch:
+        output: dict('train_loss', loss), the loss of this epoch'''
         # move model to device
         self.model.to(self.config.device)
 

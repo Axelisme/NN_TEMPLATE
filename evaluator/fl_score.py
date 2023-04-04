@@ -16,6 +16,7 @@ class F1Score(Evaluator):
         self.type:Literal['micro', 'macro', 'samples', 'weighted', 'binary'] = type
 
     def eval(self, y_pred: Tensor, y_true: Tensor) -> Tensor:
+        """calculate f1 score"""
         y_pred_:np.ndarray = y_pred.detach().cpu().numpy()
         y_pred_ = (y_pred_ > self.threshold).astype(int)
         y_true_ = one_hot(y_true.detach().cpu(), num_classes=y_pred_.shape[1]).numpy()

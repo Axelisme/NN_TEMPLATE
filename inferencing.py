@@ -38,7 +38,8 @@ def main(model_path: str) -> None:
     test_loader = DataLoader(test_set, batch_size=config.batch_size, shuffle=False, pin_memory=True)
 
     # create trainer
-    tester = Tester(model=model, config=config, test_loader=test_loader, evaluators={type(evaluator).__name__:evaluator})
+    tester = Tester(model=model, config=config, test_loader=test_loader)
+    tester.add_evaluator(name=None, evaluator=evaluator)
 
     # start testing
     result:dict = tester.eval()

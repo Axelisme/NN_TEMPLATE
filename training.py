@@ -46,7 +46,8 @@ def main():
 
     # create trainer
     trainer = Trainer(model=model, config=config, train_loader=train_loader, optimizer=optimizer, criterion=criterion)
-    valider = Tester(model=model, config=config, test_loader=valid_loader, evaluators={type(evaluator).__name__:evaluator})
+    valider = Tester(model=model, config=config, test_loader=valid_loader)
+    valider.add_evaluator(evaluator)
 
     # start training
     print('Start training model...')
