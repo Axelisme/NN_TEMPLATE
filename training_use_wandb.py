@@ -46,6 +46,7 @@ def main():
     evaluator2 = F1Score()
 
     # create dataloader
+    dataset.load_data()
     train_set:MyDataSet = dataset("train")
     valid_set:MyDataSet = dataset("valid")
     train_loader = DataLoader(train_set, batch_size=config.batch_size, shuffle=True, pin_memory=True)

@@ -37,6 +37,7 @@ def main(model_path: str) -> None:
     model.load_state_dict(torch.load(model_path, map_location=config.device))
 
     # create dataloader
+    dataset.load_data()
     test_set:data.Dataset = dataset("test")
     test_loader = DataLoader(test_set, batch_size=config.batch_size, shuffle=False, pin_memory=True)
 

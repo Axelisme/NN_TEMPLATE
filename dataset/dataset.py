@@ -11,9 +11,14 @@ from sklearn.model_selection import train_test_split
 
 class MyDataSet(data.Dataset):
     """define a class for the dataset"""
-    Data = load_digits()
-    train_data, test_data, train_label, test_label = train_test_split(Data.data, Data.target, test_size=0.2, random_state=0)
+    @classmethod
+    def load_data(cls) -> None:
+        """load the data"""
+        cls.Data = load_digits()
+        cls.train_data, cls.test_data, cls.train_label, cls.test_label = train_test_split(cls.Data.data, cls.Data.target, test_size=0.2, random_state=0)
+        
     def __init__(self, data_type: str):
+        super(MyDataSet, self).__init__()
         if data_type == 'train':
             self.input = self.train_data
             self.label = self.train_label
