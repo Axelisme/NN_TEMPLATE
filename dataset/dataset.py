@@ -14,20 +14,22 @@ class MyDataSet(data.Dataset):
     @classmethod
     def load_data(cls) -> None:
         """load the data"""
+        if hasattr(cls, 'Data'):
+            return
         cls.Data = load_digits()
-        cls.train_data, cls.test_data, cls.train_label, cls.test_label = train_test_split(cls.Data.data, cls.Data.target, test_size=0.2, random_state=0)
+        cls.train_data, cls.test_data, cls.train_label, cls.test_label = train_test_split(cls.Data.data, cls.Data.target, test_size=0.2, random_state=0) # type: ignore[attr]
         
     def __init__(self, data_type: str):
         super(MyDataSet, self).__init__()
         if data_type == 'train':
-            self.input = self.train_data
-            self.label = self.train_label
+            self.input = MyDataSet.train_data
+            self.label = MyDataSet.train_label
         elif data_type == 'valid':
-            self.input = self.test_data
-            self.label = self.test_label
+            self.input = MyDataSet.test_data
+            self.label = MyDataSet.test_label
         elif data_type == 'test':
-            self.input = self.test_data
-            self.label = self.test_label
+            self.input = MyDataSet.test_data
+            self.label = MyDataSet.test_label
         else:
             raise ValueError('data_type must be train or test')
 
@@ -41,4 +43,6 @@ class MyDataSet(data.Dataset):
 
     @classmethod
     def discription(cls) -> None:
-        print(cls.Data.DESCR)
+        """print the discription of the dataset"""
+        cls.load_data()
+        print(cls.Data.DESCR) # type: ignore[attr]
