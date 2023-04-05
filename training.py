@@ -12,28 +12,31 @@ from evaluator.em_score import EMScore
 import torch
 from torch import nn
 from torch.optim import AdamW
+from torch.utils import data
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 
 def main():
     """Main function of the script."""
-    # set random seed
-    seed = 0
-    ul.set_seed(seed=seed)
-
-    # create model and variables
-    model = MyModel()
+    # create config
     config = Config(
-        seed = seed,
-        model_name = 'model',
+        seed = 0,
+        model_name = 'test',
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
-        batch_size = 8,
-        epochs = 10,
+        batch_size = 16,
+        epochs = 100,
         lr = 0.001,
         weight_decay = 0.99,
-        SAVE = True,
-        PLOT = True
+        SAVE = False,
+        PLOT = False
     )
+
+    # set random seed
+    ul.set_seed(seed=config.seed)
+
+    # create loss, optimizer, scheduler, criterion, evaluator
+    model = MyModel()
+    #model.load_state_dict(torch.load(p.SAVED_MODELS_DIR + '/QINN_test_loss_1.477_score_0.948.pt'))
     dataset = MyDataSet
     optimizer = AdamW(model.parameters(), lr=config.lr)
     scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=config.weight_decay)
@@ -42,8 +45,8 @@ def main():
 
     # create dataloader
     dataset.load_data()
-    train_set:MyDataSet = dataset("train")
-    valid_set:MyDataSet = dataset("valid")
+    train_set:data.Dataset = dataset("train")
+    valid_set:data.Dataset = dataset("valid")
     train_loader = DataLoader(train_set, batch_size=config.batch_size, shuffle=True, pin_memory=True)
     valid_loader = DataLoader(valid_set, batch_size=config.batch_size, shuffle=False, pin_memory=True)
 

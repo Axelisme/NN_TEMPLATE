@@ -4,14 +4,17 @@
 from torch import device
 from typing import Dict, Any
 
-class Config:
+class Config(dict):
     """define a class to store the hyperparameters"""
     def __init__(self, **kwargs):
         # set default values
         self.data = kwargs
 
     def __getattr__(self, name):
-        return self.data[name]
+        if name == 'data':
+            return super().__getattr__(name) # type: ignore[attr-defined]
+        else:
+            return self.data[name]
     
     def __setattr__(self, name, value):
         if name == 'data':

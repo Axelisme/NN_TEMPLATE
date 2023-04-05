@@ -6,38 +6,47 @@ import global_var.path as p
 from model.model import MyModel
 from config.config import Config
 from tester.tester import Tester
+from loss.loss import Loss
 from dataset.dataset import MyDataSet
 from trainer.trainer import Trainer
 from evaluator.em_score import EMScore
-from evaluator.fl_score import F1Score
 import torch
 from torch import nn
 from torch.optim import AdamW
+from torch.utils import data
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
 import wandb
 
 def main():
     """Main function of the script."""
-    # set random seed
-    seed = 0
-    ul.set_seed(seed=seed)
-    # set wandb run name
-    wandb.run.name = f"template_run_{wandb.run.id}"  # type: ignore[attr]
-
-    # create model and variables
-    model = MyModel()
+    # create config
     config = Config(
-        seed = seed,
-        model_name = 'model',
+        project_name = 'Template_NN',
+        model_name = 'test',
+        seed = 0,
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
-        batch_size = 8,
-        epochs = 10,
+        batch_size = 16,
+        epochs = 100,
         lr = 0.001,
         weight_decay = 0.99,
-        SAVE = True
+        SAVE = False,
+        WANDB = True
     )
-    config.to_wandb()
+
+    # initialize wandb
+    if config.WANDB: # type: ignore[attr]
+        wandb.init(project=config.project_name, config=config.data)
+        wandb.run.name = f"{config.model_name}_{wandb.run.id}"  # type: ignore[attr]
+
+
+    # set random seed
+    ul.set_seed(seed=config.seed)
+
+    # create loss, optimizer, scheduler, criterion, evaluator
+    model = MyModel()
+    #model.load_state_dict(torch.load(p.SAVED_MODELS_DIR + '/QINN_test_loss_1.477_score_0.948.pt'))
     dataset = MyDataSet
     optimizer = AdamW(model.parameters(), lr=config.lr)
     scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=config.weight_decay)
@@ -46,8 +55,8 @@ def main():
 
     # create dataloader
     dataset.load_data()
-    train_set:MyDataSet = dataset("train")
-    valid_set:MyDataSet = dataset("valid")
+    train_set:data.Dataset = dataset("train")
+    valid_set:data.Dataset = dataset("valid")
     train_loader = DataLoader(train_set, batch_size=config.batch_size, shuffle=True, pin_memory=True)
     valid_loader = DataLoader(valid_set, batch_size=config.batch_size, shuffle=False, pin_memory=True)
 
@@ -57,9 +66,9 @@ def main():
     valider.add_evaluator(evaluator)
 
     # start training
-    wandb.watch(models=model,criterion=criterion,log='all', log_freq=100)
+    config.WANDB and wandb.watch(model, criterion=criterion, log='all', log_freq=100) # type: ignore[attr]
     print('Start training model...')
-    for epoch in range(config.epochs):
+    for epoch in tqdm(range(config.epochs),leave=True):
         print('-'*50)
         print(f'Epoch {epoch+1}/{config.epochs}')
         # train
@@ -69,27 +78,24 @@ def main():
         # update learning rate
         scheduler.step()
         # print result
-        print(f'Train loss: {train_result["train_loss"]:.3f}')
+        print(f'Train loss: {train_result["train_loss"] :.3f}')
         print("Valid result:")
         for name,score in valid_result.items():
             print(f'{name}: {score:.3f}')
         # store result
         train_result.update(valid_result)
-        wandb.log(train_result, step=epoch)
+        config.WANDB and wandb.log(train_result, step=epoch) # type: ignore[attr]
     print('Finished training model.')
 
     # save model
+    SAVE_MODEL_PATH = p.SAVED_MODELS_DIR + f"/{config.model_name}.pt"
     if config.SAVE:
-        SAVE_MODEL_PATH = p.SAVED_MODELS_DIR + f"/{config.model_name}.pt"
         print(f'Saving model to {SAVE_MODEL_PATH}')
         torch.save(model.state_dict(), SAVE_MODEL_PATH)
-        wandb.save(SAVE_MODEL_PATH)
+        config.WanbB and wandb.save(SAVE_MODEL_PATH) # type: ignore[attr]
         print('Finished saving model.')
 
-    wandb.finish()
-
-# initialize wandb
-wandb.init(project='Template_NN')
+    config.WANDB and wandb.finish() # type: ignore[attr]
 
 if __name__ == '__main__':
     # print information
@@ -99,3 +105,4 @@ if __name__ == '__main__':
 
     # start training
     main()
+
