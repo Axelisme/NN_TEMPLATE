@@ -20,9 +20,9 @@ class EMScore(Metric):
     def update(self, output: Tensor, label: Tensor) -> None:
         """update the metric"""
         pred = output.argmax(dim=-1)
-        self.correct += (pred == label).sum().item()
-        self.total += label.size(0)
+        self.correct += (pred == label).sum().item() # type: ignore
+        self.total += label.size(0) # type: ignore
 
     def compute(self) -> Tensor:
         """compute the metric"""
-        return self.correct / self.total
+        return self.correct / self.total # type: ignore

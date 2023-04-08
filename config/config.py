@@ -11,7 +11,7 @@ class Config:
 
     def __getattr__(self, name):
         if name == 'data':
-            return super().__getattr__(name)
+            return super().__getattr__(name) # type: ignore
         else:
             return self.data[name]
 
