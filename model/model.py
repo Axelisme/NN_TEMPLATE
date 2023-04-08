@@ -1,26 +1,40 @@
 
 """A neural network model."""
 
+import util.utility as ul
+from config.config import Config
+import torch
 from torch import nn
 from torch import Tensor
 from torch.nn import functional as F
 
-class MyModel(nn.Module):
-    def __init__(self):
+class Model(nn.Module):
+    def __init__(self, config:Config):
         """Initialize a neural network model."""
-        super(MyModel, self).__init__()
-        self.conv1 = nn.Conv2d(1, 16, 3, 1)
-        self.conv2 = nn.Conv2d(16, 32, 3, 1)
-        self.flaten = nn.Flatten()
-        self.fc1 = nn.Linear(4*4*32, 10)
+        super(Model, self).__init__()
+        self.config = config
+        channel1 = 256
+        channel2 = 256
 
+        self.flatten = nn.Flatten()
+        self.Conv1 = nn.Sequential(
+                                    nn.Linear(64, channel1),
+                                    nn.BatchNorm1d(channel1),
+                                    nn.ReLU()
+                                  )
+        self.Conv2 = nn.Sequential(
+                                    nn.Linear(channel1, channel2),
+                                    nn.BatchNorm1d(channel2),
+                                    nn.ReLU()
+                                  )
+        self.Linear = nn.Linear(channel2, config.output_size)
+
+    #@torch.compile
     def forward(self, x:Tensor) -> Tensor:
         """Forward a batch of data through the model."""
-        x = self.conv1(x)
-        x = nn.functional.relu(x)
-        x = self.conv2(x)
-        x = nn.functional.relu(x)
-        x = self.flaten(x)
-        x = self.fc1(x)
+        x = self.flatten(x)
+        x = self.Conv1(x)
+        x = self.Conv2(x)
+        x = self.Linear(x)
         return x
-    
+

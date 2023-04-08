@@ -3,10 +3,10 @@
 
 import util.utility as ul
 from config.config import Config
-from evaluator.ABC import Evaluator
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+from torchmetrics import Metric
 from tqdm.auto import tqdm
 from typing import Dict
 
@@ -23,8 +23,8 @@ class Tester:
         self.config = config
         self.test_loader = test_loader
         self.evaluators = dict()
-    
-    def add_evaluator(self, evaluator: Evaluator, name: str|None = None) -> None:
+
+    def add_evaluator(self, evaluator: Metric, name: str|None = None) -> None:
         '''add an evaluator to this tester:
         input: evaluator: Evaluator, the evaluator to add,
                name: str|None = None, the name of this evaluator'''
@@ -37,12 +37,12 @@ class Tester:
         output: dict(evaluator name, score), the result of this model'''
         # move model to device
         self.model.to(self.config.device)
-        
+
         # set model to eval mode
         self.model.eval()
 
         # evaluate this model
-        test_scores = {name:ul.Statistic() for name in self.evaluators.keys()}
+        test_scores = ul.Result()
         with torch.no_grad():
             for batch_idx,(input,label) in enumerate(tqdm(self.test_loader)):
                 # move input and label to device
@@ -51,9 +51,13 @@ class Tester:
                 # forward
                 output = self.model(input)
                 # calculate score
+                result = dict()
                 for name,evaluator in self.evaluators.items():
-                    test_scores[name].update(evaluator.eval(output, label).detach().cpu().item())
+                    evaluator = evaluator.to(self.config.device)
+                    score = evaluator(output, label).cpu().item()
+                    result[name] = score
+                test_scores.update(result)
 
         # return score
-        return {name:score.avg for name,score in test_scores.items()}
+        return test_scores.value
 

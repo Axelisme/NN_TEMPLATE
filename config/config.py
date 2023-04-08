@@ -1,21 +1,20 @@
 
 """define a class to store the hyperparameters"""
 
-from torch import device
 from typing import Dict, Any
 
-class Config(dict):
+class Config:
     """define a class to store the hyperparameters"""
     def __init__(self, **kwargs):
         # set default values
-        self.data = kwargs
+        self.data:Dict[str,Any] = kwargs
 
     def __getattr__(self, name):
         if name == 'data':
-            return super().__getattr__(name) # type: ignore[attr-defined]
+            return super().__getattr__(name)
         else:
             return self.data[name]
-    
+
     def __setattr__(self, name, value):
         if name == 'data':
             super().__setattr__(name, value)

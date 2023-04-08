@@ -1,9 +1,11 @@
 
 """some tools for the project"""
 
+import torch
+from typing import List, Tuple, Dict, Any, Union, Optional
+
 def set_seed(seed: int) -> None:
     """set seed for reproducibility"""
-    import torch
     from torch.backends import cudnn
     import random
     import numpy as np
@@ -17,68 +19,57 @@ def set_seed(seed: int) -> None:
     cudnn.deterministic = True
     cudnn.benchmark = False
 
-class Statistic():
-    """Computes and stores the average and current value"""
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        """reset the value"""
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        """update the value:
-        input: the value to update, the number of the value"""
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
-
 class Result:
     """handle the training result"""
-    def __init__(self, results:dict = {}) -> None:
+    def __init__(self, **results) -> None:
         """input: a dict of result, key is the name of the result, value is the result or a list of result"""
-        self.data:dict = dict()
-        self.log(results)
+        self.sums: Dict[str,Any] = dict()
+        self.counts: Dict[str,int] = dict()
+        self.value: Dict[str,Any] = dict()
+        self.log(**results)
 
-    def log(self,results:dict) -> None:
+    def log(self, **results) -> None:
         """add a result:
         input: a dict of result, key is the name of the result, value is the result or a list of result"""
         for key,value in results.items():
-            if key not in self.data.keys():
-                self.data[key] = list()
+            if key not in self.value.keys():
+                self.sums[key] = 0.
+                self.counts[key] = 0
+                self.value[key] = 0.
             if isinstance(value, list):
-                self.data[key].extend(value)
+                self.sums[key] += sum(value)
+                self.counts[key] += len(value)
+                self.value[key] = value[-1]
             else:
-                self.data[key].append(value)
+                self.sums[key] += value
+                self.counts[key] += 1
+                self.value[key] = value
+
+    def update(self, results: Dict[str,Any]) -> None:
+        """update a result:
+        input: a dict of result, key is the name of the result, value is the result or a list of result"""
+        self.log(**results)
 
     def __getitem__(self, key) -> list:
         """get a result:
         input: the name of the result,
         output: a list of result"""
-        return self.data[key]
+        return self.value[key]
 
-    def save(self, path: str) -> None:
-        """save the result to a csv file:
-        input: the path to save the result"""
-        import pandas as pd
-        df = pd.DataFrame(self.data)
-        df.to_csv(path,index=False)
+    def average(self, key: str) -> Any:
+        """get the average of a result:
+        input: the name of the result,
+        output: the average of the result"""
+        return self.sums[key]/self.counts[key]
 
-    def load(self, path: str) -> None:
-        """load the result from a csv file:
-        input: the path to load the result"""
-        import pandas as pd
-        df = pd.read_csv(path)
-        self.data = df.to_dict('list')
+    def sum(self, key: str) -> Any:
+        """get the sum of a result:
+        input: the name of the result,
+        output: the sum of the result"""
+        return self.sums[key]
 
-    def plot(self) -> None:
-        """plot the result"""
-        import matplotlib.pyplot as plt
-        for key in self.data.keys():
-            plt.plot(self.data[key], label=key)
-        plt.legend()
-        plt.show()
+    def count(self, key: str) -> int:
+        """get the count of a result:
+        input: the name of the result,
+        output: the count of the result"""
+        return self.counts[key]

@@ -37,9 +37,9 @@ class Trainer:
 
         # set model to train mode
         self.model.train()
-        
+
         # train for one epoch
-        train_loss = ul.Statistic()
+        train_loss = ul.Result()
         for batch_idx,(input,label) in enumerate(tqdm(self.train_loader)):
             # move input and label to device
             input:Tensor = input.to(self.config.device)
@@ -52,10 +52,8 @@ class Trainer:
             loss.backward()
             self.optimizer.step()
             # store loss
-            train_loss.update(loss.detach().cpu().item())
-        
-        # return loss
-        return {'train_loss':train_loss.avg}
+            train_loss.log(train_loss=loss.cpu().item())
 
-        
+        # return loss
+        return train_loss.value
 

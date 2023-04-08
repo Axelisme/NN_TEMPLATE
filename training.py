@@ -1,52 +1,65 @@
 
 """A script to train a model on the train dataset."""
 
+#%%
 import util.utility as ul
 import global_var.path as p
-from model.model import MyModel
+from loss.loss import MyLoss
+from model.model import Model
 from config.config import Config
 from tester.tester import Tester
-from dataset.dataset import MyDataSet
+from dataset.dataset import DataSet
 from trainer.trainer import Trainer
-from evaluator.em_score import EMScore
 import torch
 from torch import nn
 from torch.optim import AdamW
-from torch.utils import data
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
+import torchmetrics.classification as cf
+from tqdm.auto import tqdm
+import wandb
 
+#%%
+# create config
+config = Config(
+    project_name = 'NN_Template',
+    model_name = 'NN_test',
+    seed = 0,
+    input_size = 8,
+    output_size = 10,
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
+    batch_size = 16,
+    epochs = 100,
+    lr = 0.0001,
+    weight_decay = 0.99,
+    split_ratio = 0.2,
+    SAVE = False,
+    WandB = False
+)
+
+#%%
 def main():
     """Main function of the script."""
-    # create config
-    config = Config(
-        seed = 0,
-        model_name = 'test',
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
-        batch_size = 16,
-        epochs = 100,
-        lr = 0.001,
-        weight_decay = 0.99,
-        SAVE = False,
-        PLOT = False
-    )
+
+    # set float32 matmul precision
+    torch.set_float32_matmul_precision('high')
 
     # set random seed
     ul.set_seed(seed=config.seed)
 
     # create loss, optimizer, scheduler, criterion, evaluator
-    model = MyModel()
-    #model.load_state_dict(torch.load(p.SAVED_MODELS_DIR + '/QINN_test_loss_1.477_score_0.948.pt'))
-    dataset = MyDataSet
+    model = Model(config)
+    #model.load_state_dict(torch.load(p.SAVED_MODELS_DIR + '/QINN_test.pt'))
     optimizer = AdamW(model.parameters(), lr=config.lr)
     scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=config.weight_decay)
     criterion = nn.CrossEntropyLoss()
-    evaluator = EMScore()
+    evaluator = cf.MulticlassAccuracy(num_classes=config.output_size,average='micro', validate_args=True)
+    evaluator2 = cf.MulticlassF1Score(num_classes=config.output_size,average='micro', validate_args=True)
 
     # create dataloader
-    dataset.load_data()
-    train_set:data.Dataset = dataset("train")
-    valid_set:data.Dataset = dataset("valid")
+    DataSet.load_data(config)
+    train_set:DataSet = DataSet("train")
+    valid_set:DataSet = DataSet("valid")
     train_loader = DataLoader(train_set, batch_size=config.batch_size, shuffle=True, pin_memory=True)
     valid_loader = DataLoader(valid_set, batch_size=config.batch_size, shuffle=False, pin_memory=True)
 
@@ -56,9 +69,9 @@ def main():
     valider.add_evaluator(evaluator)
 
     # start training
-    result = ul.Result()
+    config.WandB and wandb.watch(model, criterion=criterion, log='all', log_freq=500) # type: ignore
     print('Start training model...')
-    for epoch in range(config.epochs):
+    for epoch in tqdm(range(config.epochs)):
         print('-'*50)
         print(f'Epoch {epoch+1}/{config.epochs}')
         # train
@@ -68,35 +81,36 @@ def main():
         # update learning rate
         scheduler.step()
         # print result
-        print(f'Train loss: {train_result["train_loss"]:.3f}')
+        print(f'Train loss: {train_result["train_loss"]}')
         print("Valid result:")
         for name,score in valid_result.items():
-            print(f'{name}: {score:.3f}')
+            print(f'{name}: {score}')
         # store result
         train_result.update(valid_result)
-        result.log(train_result)
+        config.WandB and wandb.log(train_result, step=epoch) # type: ignore
     print('Finished training model.')
 
     # save model
+    SAVE_MODEL_PATH = p.SAVED_MODELS_DIR + f"/{config.model_name}.pt"
     if config.SAVE:
-        SAVE_MODEL_PATH = p.SAVED_MODELS_DIR + f"/{config.model_name}.pt"
-        SAVE_RESULT_PATH = p.SAVED_RESULTS_DIR + f"/{config.model_name}.csv"
         print(f'Saving model to {SAVE_MODEL_PATH}')
         torch.save(model.state_dict(), SAVE_MODEL_PATH)
-        result.save(SAVE_RESULT_PATH)
+        config.WandB and wandb.save(SAVE_MODEL_PATH) # type: ignore
         print('Finished saving model.')
-
-    if config.PLOT:
-        # plot result
-        print('Plotting result...')
-        result.plot()
 
 
 if __name__ == '__main__':
     # print information
     print(f'Torch version: {torch.__version__}')
-    print(f'Data discription: ')
-    MyDataSet.discription()
 
-    # start training
+    #%% initialize wandb
+    if config.WandB:
+        wandb.init(project=config.project_name, config=config.data)
+        wandb.run.name = f"{config.model_name}_{wandb.run.id}" # type: ignore
+
+    #%% start training
     main()
+
+    #%% finish wandb
+    config.WandB and wandb.finish() # type: ignore
+
