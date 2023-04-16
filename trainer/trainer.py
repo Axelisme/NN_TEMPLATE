@@ -40,7 +40,7 @@ class Trainer:
 
         # train for one epoch
         train_loss = ul.Result()
-        for batch_idx,(input,label) in enumerate(tqdm(self.train_loader)):
+        for batch_idx,(input,label) in enumerate(tqdm(self.train_loader, desc='Train')):
             # move input and label to device
             input:Tensor = input.to(self.config.device)
             label:Tensor = label.to(self.config.device)

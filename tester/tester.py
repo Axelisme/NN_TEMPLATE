@@ -44,7 +44,7 @@ class Tester:
         # evaluate this model
         test_scores = ul.Result()
         with torch.no_grad():
-            for batch_idx,(input,label) in enumerate(tqdm(self.test_loader)):
+            for batch_idx,(input,label) in enumerate(tqdm(self.test_loader, desc='Test ')):
                 # move input and label to device
                 input = input.to(self.config.device)
                 label = label.to(self.config.device)
