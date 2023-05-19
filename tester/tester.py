@@ -2,9 +2,10 @@
 """define a class to test the model"""
 
 import util.utility as ul
-from config.config import Config
+from config.configClass import Config
 import torch
 from torch import nn
+from torch import Tensor
 from torch.utils.data import DataLoader
 from torchmetrics import Metric
 from tqdm.auto import tqdm
@@ -35,29 +36,26 @@ class Tester:
     def eval(self) -> dict:
         '''test a model on test set:
         output: dict(evaluator name, score), the result of this model'''
-        # move model to device
+        # initial model
         self.model.to(self.config.device)
-
-        # set model to eval mode
         self.model.eval()
 
+        # initial evaluators
+        for evaluator in self.evaluators.values():
+            evaluator = evaluator.to(self.config.device).reset()
+
         # evaluate this model
-        test_scores = ul.Result()
         with torch.no_grad():
             for batch_idx,(input,label) in enumerate(tqdm(self.test_loader, desc='Test ')):
                 # move input and label to device
-                input = input.to(self.config.device)
-                label = label.to(self.config.device)
+                input:Tensor = Tensor(input).to(self.config.device)
+                label:Tensor = Tensor(label).to(self.config.device)
                 # forward
                 output = self.model(input)
                 # calculate score
-                result = dict()
-                for name,evaluator in self.evaluators.items():
-                    evaluator = evaluator.to(self.config.device)
-                    score = evaluator(output, label).cpu().item()
-                    result[name] = score
-                test_scores.update(result)
+                for evaluator in self.evaluators.values():
+                    evaluator.update(output, label)
 
         # return score
-        return test_scores.value
+        return {name:evaluator.compute() for name,evaluator in self.evaluators.items()}
 

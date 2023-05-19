@@ -1,29 +1,19 @@
 
 """A script to run inference on a trained model."""
 
+import os
 from sys import argv
+from typing import Any
 import global_var.path as p
 import util.utility as ul
 from model.model import Model
 from dataset.dataset import DataSet
-from config.config import Config
+from config.configClass import Config
+from config.hyperparameter import config
 from tester.tester import Tester
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
-import torchmetrics.classification as cf
-
-# create config
-config = Config(
-    project_name = 'NN_Template',
-    model_name = 'NN_test',
-    seed = 0,
-    input_size = 8,
-    output_size = 10,
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
-    batch_size = 16,
-    split_ratio = 0.2
-)
 
 def init(config:Config):
     """Initialize the script."""
@@ -34,35 +24,21 @@ def init(config:Config):
     # set random seed
     ul.set_seed(seed=config.seed)
 
-def show_result(config:Config, valid_result:dict):
-    """Print result of training and validation."""
-    # print result
-    print("Valid result:")
-    for name,score in valid_result.items():
-        print(f'\t{name}: {score}')
-
 def main(config:Config, model_path:str) -> None:
     """Main function of the script."""
 
     # create model and load
     model = Model(config)                                                      # create model
     model.load_state_dict(torch.load(model_path, map_location=config.device))  # load model
-    evaluator = cf.MulticlassAccuracy(num_classes=config.output_size,average='micro', validate_args=True)  # create evaluator
+    model.eval()                                                               # set model to eval mode
 
     # prepare dataset and dataloader
     DataSet.load_data(config)           # initialize dataset
     test_set:DataSet = DataSet("test")  # create test dataset
-    test_loader = DataLoader(test_set, batch_size=config.batch_size, shuffle=False, pin_memory=True)  # create test dataloader
+    test_loader = DataLoader(test_set, batch_size=1, shuffle=False, pin_memory=True) # create test dataloader
 
-    # create trainer
-    tester = Tester(model=model, config=config, test_loader=test_loader)
-    tester.add_evaluator(evaluator)
+    pass
 
-    # start testing
-    result:dict = tester.eval()
-
-    # show result
-    show_result(config, result)
 
 if __name__ == '__main__':
     # print version information

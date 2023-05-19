@@ -1,7 +1,12 @@
 
 """some tools for the project"""
 
+import os
 import torch
+from torch import nn
+import wandb
+import global_var.path as p
+from config.configClass import Config
 from typing import List, Tuple, Dict, Any, Union, Optional
 
 def set_seed(seed: int) -> None:
@@ -18,6 +23,48 @@ def set_seed(seed: int) -> None:
     random.seed(seed)
     cudnn.deterministic = True
     cudnn.benchmark = False
+
+def init(config:Config):
+    """Initialize the script."""
+    # create directory
+    os.makedirs(p.SAVED_MODELS_DIR, exist_ok=True)
+    # set float32 matmul precision
+    torch.set_float32_matmul_precision('high')
+    # set random seed
+    set_seed(seed=config.seed)
+    # initialize wandb
+    if config.WandB:
+        wandb.init(project=config.project_name, name=config.model_name, config=config.data)
+
+def show_result(config:Config, epoch:int, train_result:dict, valid_result:dict):
+    """Print result of training and validation."""
+    # print result
+    #os.system('clear')
+    print(f'Epoch: ({epoch} / {config.epochs})')
+    print("Train result:")
+    print(f'\ttrain_loss: {train_result["train_loss"]:0.4f}')
+    print("Valid result:")
+    for name,score in valid_result.items():
+        print(f'\t{name}: {score:0.4f}')
+
+def log_result(epoch:int, train_result:dict, valid_result:dict):
+    """log the result."""
+    result = train_result
+    result.update(valid_result)
+    wandb.log(result)
+
+def store_model(config:Config, model:nn.Module):
+    """Store the model."""
+    # save model
+    SAVE_MODEL_PATH = p.SAVED_MODELS_DIR + f"/{config.model_name}.pt"
+    print(f'Saving model to {SAVE_MODEL_PATH}')
+    torch.save(model.state_dict(), SAVE_MODEL_PATH)
+    if config.WandB:
+        wandb.save(SAVE_MODEL_PATH)
+
+def conv2d_output_size(input_size: int, kernel_size: int, stride: int, padding: int, dilation: int) -> int:
+    """calculate the output size of a convolutional layer"""
+    return int((input_size+2*padding-dilation*(kernel_size-1)-1)/stride+1)
 
 class Result:
     """handle the training result"""

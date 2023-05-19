@@ -2,13 +2,14 @@
 """define a class for training a model"""
 
 import util.utility as ul
-from config.config import Config
+from config.configClass import Config
 import torch
 from torch import nn
 from torch import Tensor
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
+import wandb
 
 class Trainer:
     def __init__(self,
@@ -42,8 +43,8 @@ class Trainer:
         train_loss = ul.Result()
         for batch_idx,(input,label) in enumerate(tqdm(self.train_loader, desc='Train')):
             # move input and label to device
-            input:Tensor = input.to(self.config.device)
-            label:Tensor = label.to(self.config.device)
+            input:Tensor = Tensor(input).to(self.config.device)
+            label:Tensor = Tensor(label).to(self.config.device)
             # forward
             self.optimizer.zero_grad()
             output:Tensor = self.model(input)

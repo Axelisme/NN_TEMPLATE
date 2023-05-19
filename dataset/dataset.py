@@ -3,7 +3,7 @@
 
 import global_var.path as p
 import util.utility as ul
-from config.config import Config
+from config.configClass import Config
 import torch
 import torch.utils.data as data
 from sklearn.model_selection import train_test_split
