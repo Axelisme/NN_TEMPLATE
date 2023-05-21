@@ -21,6 +21,10 @@ class Config:
         else:
             self.data[name] = value
 
+    def update(self, config:"Config"):
+        """update the config with another config"""
+        self.data.update(config.data)
+
     def to_wandb(self) -> None:
         """add the config to wandb"""
         import wandb

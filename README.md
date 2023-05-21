@@ -1,6 +1,6 @@
 # NEURAL NETWORK TEMPLATE
 
-Dependence: `torch`, `tqdm`, `torchmetric`, `wandb`, `torchmetric`  
+Dependence: `torch`, `tqdm`, `torchmetric`, `wandb`  
 Optional: `numpy`, `scikit-learn`, `pandas`, `matplotlib`
 
 實作功能：

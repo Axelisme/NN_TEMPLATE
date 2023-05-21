@@ -4,25 +4,15 @@
 import os
 from sys import argv
 from typing import Any
-import global_var.path as p
 import util.utility as ul
-from model.model import Model
+from model.custom_model import Model
 from dataset.dataset import DataSet
 from config.configClass import Config
-from config.hyperparameter import config
+import hyperparameter as p
 from tester.tester import Tester
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
-
-def init(config:Config):
-    """Initialize the script."""
-    # create directory
-    os.makedirs(p.SAVED_MODELS_DIR, exist_ok=True)
-    # set float32 matmul precision
-    torch.set_float32_matmul_precision('high')
-    # set random seed
-    ul.set_seed(seed=config.seed)
 
 def main(config:Config, model_path:str) -> None:
     """Main function of the script."""
@@ -37,6 +27,7 @@ def main(config:Config, model_path:str) -> None:
     test_set:DataSet = DataSet("test")  # create test dataset
     test_loader = DataLoader(test_set, batch_size=1, shuffle=False, pin_memory=True) # create test dataloader
 
+    # TODO: inference
     pass
 
 
@@ -58,7 +49,7 @@ if __name__ == '__main__':
         save_model_path = os.path.join(p.SAVED_MODELS_DIR,all_model[0]) 
 
     # initialize
-    init(config)
+    ul.init(p.infer_config)
 
     # run main function
-    main(config, save_model_path)
+    main(p.infer_config, save_model_path)

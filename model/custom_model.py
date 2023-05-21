@@ -1,5 +1,5 @@
 
-"""A neural network model."""
+"""A custom neural network model."""
 
 import util.utility as ul
 from config.configClass import Config
@@ -8,14 +8,12 @@ from torch import nn
 from torch import Tensor
 from torch.nn import functional as F
 
-class Model(nn.Module):
+class CostomModel(nn.Module):
     def __init__(self, config:Config):
-        """Initialize a neural network model."""
-        super(Model, self).__init__()
-        self.config = config
+        super(CostomModel, self).__init__()
 
     #@torch.compile
     def forward(self, x:Tensor) -> Tensor:
-        """Forward a batch of data through the model."""
-        return x
+        out = x
+        return out
 

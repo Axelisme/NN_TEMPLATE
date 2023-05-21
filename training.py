@@ -4,11 +4,10 @@
 #%%
 import os
 import util.utility as ul
-import global_var.path as p
 from loss.loss import MyLoss
-from model.model import Model
+from model.custom_model import Model
 from config.configClass import Config
-from config.hyperparameter import config
+import hyperparameter as p
 from tester.tester import Tester
 from dataset.dataset import DataSet
 from trainer.trainer import Trainer
@@ -69,8 +68,10 @@ if __name__ == '__main__':
     print(f'Torch version: {torch.__version__}')
 
     # initialize
-    ul.init(config)
+    ul.init(p.train_config)
 
     # start training
-    main(config)
+    main(p.train_config)
 
+
+# %%
