@@ -20,15 +20,18 @@ import torchmetrics.classification as cf
 from tqdm.auto import tqdm
 import wandb
 
+load_path = os.path.join(p.SAVED_MODELS_DIR, f"{p.train_config.model_name}.pt")
+save_path = load_path
+
 def main(config:Config):
     """Main function of the script."""
 
     # setup model and other components
     model = Model(config)                                                          # create model
-    #model.load_state_dict(torch.load(p.SAVED_MODELS_DIR + '/QINN_test.pt'))       # load model
+    model.load_state_dict(torch.load(load_path))                                   # load model
     optimizer = AdamW(model.parameters(), lr=config.lr)                            # create optimizer
     scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=config.weight_decay)   # create scheduler
-    criterion = MyLoss()                                          # create criterion
+    criterion = MyLoss()                                                           # create criterion
     evaluator = cf.BinaryAccuracy()
     evaluator2 = cf.BinaryF1Score()
     if config.WandB:
@@ -37,8 +40,8 @@ def main(config:Config):
     # prepare dataset and dataloader
     train_set:DataSet = DataSet("train")    # create train dataset
     valid_set:DataSet = DataSet("valid")    # create valid dataset
-    train_loader = DataLoader(train_set, batch_size=config.batch_size, shuffle=True, pin_memory=True)  # create train dataloader
-    valid_loader = DataLoader(valid_set, batch_size=config.batch_size, shuffle=False, pin_memory=True) # create valid dataloader
+    train_loader = DataLoader(train_set, batch_size=config.batch_size, shuffle=False, pin_memory=True)  # create train dataloader
+    valid_loader = DataLoader(valid_set, batch_size=config.batch_size, shuffle=False, pin_memory=True)  # create valid dataloader
 
     # create trainer and tester
     trainer = Trainer(model=model, config=config, train_loader=train_loader, optimizer=optimizer, criterion=criterion)
@@ -49,18 +52,18 @@ def main(config:Config):
     # start training
     train_result = dict(train_loss=0)
     valid_result = dict.fromkeys(valider.evaluators.keys(), 0)
-    for epoch in tqdm(range(1,config.epochs+1), desc="Epoch"):
-        ul.show_result(config, epoch, train_result, valid_result)  # show result
-        train_result = trainer.train()                          # train a epoch
-        valid_result = valider.eval()                           # validate a epoch
-        scheduler.step()                                        # update learning rate
+    for epoch in range(0,config.epochs):
+        ul.show_result(config, epoch, train_result, valid_result)          # show result
+        train_result = trainer.train()                                     # train a epoch
+        valid_result = valider.eval()                                      # validate a epoch
+        scheduler.step()                                                   # update learning rate
         if config.WandB:
-            ul.log_result(epoch, train_result, valid_result)       # store result
+            ul.log_result(epoch, train_result, valid_result)               # log result to wandb
     ul.show_result(config, config.epochs, train_result, valid_result)      # show result
 
     # store model
     if config.SAVE:
-        ul.store_model(config, model)
+        ul.store_model(config, model, save_path)
 
 if __name__ == '__main__':
     #%% print information

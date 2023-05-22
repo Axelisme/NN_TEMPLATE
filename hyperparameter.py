@@ -5,7 +5,7 @@ from config.configClass import Config
 import torch
 from os import path
 
-ROOT_DIR = path.dirname(path.dirname(path.abspath(__file__)))           # Path to the workspace of the project
+ROOT_DIR = path.dirname(path.abspath(__file__))                         # Path to the workspace of the project
 DATA_DIR = path.join(ROOT_DIR, 'data')                                  # Path to the data directory
 RAW_DATA_DIR = path.join(DATA_DIR, 'rawdata')                           # Path to the raw data directory
 PROCESSED_DATA_DIR = path.join(DATA_DIR, 'processed')                   # Path to the processed data directory
