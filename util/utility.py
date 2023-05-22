@@ -62,55 +62,65 @@ def log_result(epoch:int, train_result:dict, valid_result:dict):
 
 def store_model(config:Config, model:nn.Module, save_path = None):
     """Store the model."""
+    import torch
     import wandb
-    # set save path
-    if save_path is None:
-        if hasattr(config,"model_name"):
-            save_path = p.SAVED_MODELS_DIR + f"/{config.model_name}.pt"
-        else:
-            save_path = p.SAVED_MODELS_DIR + f"/model.pt"
     # save model
+    if save_path is None:
+        save_path = p.SAVED_MODELS_DIR + f"/{config.model_name}.pt"
     print(f'Saving model to {save_path}')
     torch.save(model.state_dict(), save_path)
-    if hasattr(config,"WandB") and config.WandB:
+    if config.WandB:
         wandb.save(save_path)
 
-def conv_output_size(input_size, kernel_size, stride = 1, padding = 0, dilation = 1) -> int:
+def conv_out(input_size, kernel_size, stride = 1, padding = 0, dilation = 1) -> int:
     """calculate the output size of a convolutional layer"""
-    return int((input_size+2*padding-dilation*(kernel_size-1)-1)/stride+1)
+    return (input_size+2*padding-dilation*(kernel_size-1)-1)//stride+1
 
-def load_image(path:str, size = None) -> torch.Tensor:
-    """load image form given path and transform it to tensor"""
-    import torchvision.transforms as transforms
-    import cv2
-    img = cv2.imread(path)
+def pool_out(input_size, kernel_size, stride = None, padding = 0, dilation = 1) -> int:
+    """calculate the output size of a pooling layer"""
+    if stride is None:
+        stride = kernel_size
+    return conv_out(input_size, kernel_size, stride, padding, dilation)
+
+def conv_trans_out(input_size, kernel_size, stride = 1, padding = 0, dilation = 1, output_padding = 0) -> int:
+    """calculate the output size of a convolutional transpose layer"""
+    return int((input_size-1)*stride-2*padding+dilation*(kernel_size-1)+output_padding+1)
+
+def load_image(path:str, size:Tuple = None) -> Any:
+    """load image form given path and transform it to tensor
+        input: path to the image, size of the image (H,W)
+        output: a PIL image"""
+    import PIL
+    img = PIL.Image.open(path, mode='r').convert('RGB')
     if size is not None:
-        img = cv2.resize(img, size[1:])
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    img = transforms.ToTensor()(img)
+        img = img.resize(size[::-1])
     return img
 
 def load_subfolder_as_label(root: str, loader = None, max_num = 1000) -> Tuple[List,List[int],List[str]]:
     """load data from a folder, and use the subfolder name as label name
-        input: path to the folder
-        output: a tuple of (data, data_labels, label_names)"""
+        input: path to the folder,
+               a loader(root,reldir,file), default to return reldir/file,
+               max number of data to load per label
+        output: data, data_labels, label_names"""
     import os
+    if loader is None:
+        loader = lambda root,reldir,file: os.path.join(reldir,file)
     datas = []
     labels = []
     label_names = []
-    for label_id, dir in enumerate(os.listdir(root)):
-        label_names.append(dir)
-        count = 0
-        for file in os.listdir(os.path.join(root,dir)):
-            if count >= max_num:
+    label_num = 0
+    for dir, _, files in os.walk(root):
+        if root == dir:
+            continue
+        # eg. root = 'data', dir = 'data/A/X/1', label_name = 'A_X_1'
+        reldir = os.path.relpath(dir, root)
+        label_names.append(reldir.replace(os.sep,'_'))
+        for id, file in enumerate(files):
+            if id >= max_num:
                 break
-            file_path = os.path.join(dir,file)
-            if loader is None:
-                datas.append(file_path)
-            else:
-                datas.append(loader(os.path.join(root,file_path)))
-            labels.append(label_id)
-            count += 1
+            datas.append(loader(root, reldir, file))
+            labels.append(label_num)
+        label_num += 1
     return datas, labels, label_names
 
 class ShuffledIterable:
@@ -137,17 +147,22 @@ total_time = dict()
 def measure_time(func):
     """measure the time of a function"""
     import time
+    global total_time
+    total_time[func.__name__] = 0
     def wrapper(*args, **kwargs):
         start = time.time()
         result = func(*args, **kwargs)
         end = time.time()
-        global total_time
-        if func.__name__ not in total_time.keys():
-            total_time[func.__name__] = 0
-        else:
-            total_time[func.__name__] += end-start
+        total_time[func.__name__] += end-start
         return result
     return wrapper
+
+def show_time():
+    """show the time of each function"""
+    global total_time
+    print("Time:")
+    for func_name, time in total_time.items():
+        print(f'\t{func_name}: {time:0.4f}')
 
 class Result:
     """handle the training result"""

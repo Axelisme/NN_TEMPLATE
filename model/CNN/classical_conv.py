@@ -17,8 +17,8 @@ class ClassicalConv(nn.Module):
 
         # conv1: 64*H1*W1
         self.Conv1_channel = 64
-        self.Conv1_height = ul.conv_output_size(ul.conv_output_size(self.input_height, 5), 2, 2)
-        self.Conv1_width  = ul.conv_output_size(ul.conv_output_size(self.input_width , 5), 2, 2)
+        self.Conv1_height = ul.conv_out(ul.conv_out(self.input_height, 5), 2, 2)
+        self.Conv1_width  = ul.conv_out(ul.conv_out(self.input_width , 5), 2, 2)
         self.Conv1 = nn.Sequential(
             nn.Conv2d(self.input_channel,
                         self.Conv1_channel,
@@ -33,8 +33,8 @@ class ClassicalConv(nn.Module):
 
         # conv2: 64*H2*W2
         self.Conv2_channel = 64
-        self.Conv2_height = ul.conv_output_size(ul.conv_output_size(self.Conv1_height, 7), 2, 2)
-        self.Conv2_width  = ul.conv_output_size(ul.conv_output_size(self.Conv1_width , 7), 2, 2)
+        self.Conv2_height = ul.conv_out(ul.conv_out(self.Conv1_height, 7), 2, 2)
+        self.Conv2_width  = ul.conv_out(ul.conv_out(self.Conv1_width , 7), 2, 2)
         self.Conv2 = nn.Sequential(
             nn.Conv2d(self.Conv1_channel,
                         self.Conv2_channel,
@@ -49,8 +49,8 @@ class ClassicalConv(nn.Module):
 
         # conv3: 128*H3*W3
         self.Conv3_channel = 128
-        self.Conv3_height = ul.conv_output_size(ul.conv_output_size(self.Conv2_height, 7), 2, 2)
-        self.Conv3_width  = ul.conv_output_size(ul.conv_output_size(self.Conv2_width , 7), 2, 2)
+        self.Conv3_height = ul.conv_out(ul.conv_out(self.Conv2_height, 7), 2, 2)
+        self.Conv3_width  = ul.conv_out(ul.conv_out(self.Conv2_width , 7), 2, 2)
         self.Conv3 = nn.Sequential(
             nn.Conv2d(self.Conv2_channel,
                         self.Conv3_channel,

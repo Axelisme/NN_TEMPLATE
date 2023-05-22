@@ -35,7 +35,6 @@ def main(config:Config):
         wandb.watch(models=model, criterion=criterion, log='all', log_freq=1)
 
     # prepare dataset and dataloader
-    DataSet.load_data(config)               # initialize dataset
     train_set:DataSet = DataSet("train")    # create train dataset
     valid_set:DataSet = DataSet("valid")    # create valid dataset
     train_loader = DataLoader(train_set, batch_size=config.batch_size, shuffle=True, pin_memory=True)  # create train dataloader
@@ -64,14 +63,14 @@ def main(config:Config):
         ul.store_model(config, model)
 
 if __name__ == '__main__':
-    # print information
+    #%% print information
     print(f'Torch version: {torch.__version__}')
-
-    # initialize
     ul.init(p.train_config)
+    DataSet.load_data(p.train_config)
 
-    # start training
+    #%% start training
     main(p.train_config)
+    ul.show_time()
 
-
-# %%
+    #%% close dataset
+    DataSet.close()

@@ -13,7 +13,6 @@ class DataSet(data.Dataset):
     @classmethod
     def load_data(cls, config: Config|None = None) -> None:
         """load the data"""
-        """load the data"""
         if hasattr(cls, "have_loaded") and cls.have_loaded:
             return
         if config is None:
@@ -26,9 +25,14 @@ class DataSet(data.Dataset):
         cls.db = data.Dataset()                # TODO: load data
         cls.train_db, cls.test_db = data.random_split(cls.db, [1-config.test_ratio, config.test_ratio])
 
-    def __init__(self, data_type: str):
-        super(DataSet, self).__init__()
+    @classmethod
+    def close(cls):
+        """close the data"""
+        pass
 
+    def __init__(self, data_type: str, config: Config|None = None):
+        super(DataSet, self).__init__()
+        DataSet.load_data(config)
         if data_type == "train":
             self.datas = DataSet.train_db
         elif data_type == "valid":
@@ -39,6 +43,7 @@ class DataSet(data.Dataset):
             raise ValueError("data_type must be 'train' or 'valid'")
 
         self.data_type = data_type
+        #self.datas = [self.datas[i] for i in range(len(self))]  # preloading
 
     def __getitem__(self,idx):
         return self.datas[idx]

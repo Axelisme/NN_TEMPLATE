@@ -3,7 +3,7 @@
 
 import torch.nn as nn
 from torch import Tensor
-import model.layer_blocks as lb
+import model.CNN.layer_blocks as lb
 
 class ResNet(nn.Module):
     def __init__(self, in_channel, layers, num_classes=10):
