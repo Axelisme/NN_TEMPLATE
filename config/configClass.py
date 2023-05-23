@@ -10,10 +10,13 @@ class Config:
         self.data:Dict[str,Any] = kwargs
 
     def __getattr__(self, name):
-        if name == 'data':
-            return super().__getattr__(name) # type: ignore
-        else:
-            return self.data[name]
+        try:
+            if name == 'data':
+                return super().__getattr__(name) # type: ignore
+            else:
+                return self.data[name]
+        except KeyError:
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
 
     def __setattr__(self, name, value):
         if name == 'data':
@@ -21,11 +24,11 @@ class Config:
         else:
             self.data[name] = value
 
-    def update(self, config:"Config"):
-        """update the config with another config"""
-        self.data.update(config.data)
-
     def to_wandb(self) -> None:
         """add the config to wandb"""
         import wandb
         wandb.config.update(self.data)
+
+    def update(self,config:"Config") -> None:
+        """update the config"""
+        self.data.update(config.data)

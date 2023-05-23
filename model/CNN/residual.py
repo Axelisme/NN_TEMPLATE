@@ -1,6 +1,7 @@
 
 """define a residual block"""
 
+import torch
 import torch.nn as nn
 from torch import Tensor
 import model.CNN.layer_blocks as lb
@@ -18,6 +19,7 @@ class ResNet(nn.Module):
         self.flat = nn.Flatten()
         self.fc = nn.Linear(64, num_classes)
 
+    @torch.compile
     def forward(self, x:Tensor) -> Tensor:
         out = self.conv(x)
         out = self.bn(out)

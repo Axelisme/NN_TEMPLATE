@@ -1,6 +1,7 @@
 
 """some tools for the project"""
 
+import numpy as np
 import torch
 import torch.nn as nn
 import hyperparameter as p
@@ -9,6 +10,7 @@ from typing import List, Tuple, Dict, Any, Union, Optional
 
 def set_seed(seed: int) -> None:
     """set seed for reproducibility"""
+    import torch
     from torch.backends import cudnn
     import random
     import numpy as np
@@ -26,19 +28,12 @@ def init(config:Config):
     """Initialize the script."""
     import os
     import wandb
-
     # create directory
     os.makedirs(p.SAVED_MODELS_DIR, exist_ok=True)
-
     # set float32 matmul precision
     torch.set_float32_matmul_precision('high')
-
     # set random seed
-    if hasattr(config,"seed"):
-        set_seed(seed=config.seed)
-    else:
-        set_seed(seed=0)
-
+    set_seed(seed=config.seed)
     # initialize wandb
     if hasattr(config,"WandB") and config.WandB:
         wandb.init(project=config.project_name, name=config.model_name, config=config.data)
@@ -46,6 +41,8 @@ def init(config:Config):
 def show_result(config:Config, epoch:int, train_result:dict, valid_result:dict):
     """Print result of training and validation."""
     # print result
+    #import os
+    #os.system('clear')
     print(f'Epoch: ({epoch} / {config.epochs})')
     print("Train result:")
     print(f'\ttrain_loss: {train_result["train_loss"]:0.4f}')
@@ -62,31 +59,38 @@ def log_result(epoch:int, train_result:dict, valid_result:dict):
 
 def store_model(config:Config, model:nn.Module, save_path = None):
     """Store the model."""
-    import torch
     import wandb
     # save model
     if save_path is None:
         save_path = p.SAVED_MODELS_DIR + f"/{config.model_name}.pt"
     print(f'Saving model to {save_path}')
     torch.save(model.state_dict(), save_path)
-    if config.WandB:
+    if hasattr(config,"WandB") and config.WandB:
         wandb.save(save_path)
 
-def conv_out(input_size, kernel_size, stride = 1, padding = 0, dilation = 1) -> int:
+def conv_output_size(input_size, kernel_size, stride = 1, padding = 0, dilation = 1) -> int:
     """calculate the output size of a convolutional layer"""
     return (input_size+2*padding-dilation*(kernel_size-1)-1)//stride+1
 
-def pool_out(input_size, kernel_size, stride = None, padding = 0, dilation = 1) -> int:
+def pool_output_size(input_size, kernel_size, stride = None, padding = 0, dilation = 1) -> int:
     """calculate the output size of a pooling layer"""
     if stride is None:
         stride = kernel_size
-    return conv_out(input_size, kernel_size, stride, padding, dilation)
+    return conv_output_size(input_size, kernel_size, stride, padding, dilation)
 
-def conv_trans_out(input_size, kernel_size, stride = 1, padding = 0, dilation = 1, output_padding = 0) -> int:
+def conv_transpose_output_size(input_size, kernel_size, stride = 1, padding = 0, dilation = 1, output_padding = 0) -> int:
     """calculate the output size of a convolutional transpose layer"""
     return int((input_size-1)*stride-2*padding+dilation*(kernel_size-1)+output_padding+1)
 
-def load_image(path:str, size:Tuple = None) -> Any:
+def clear_folder(path:str):
+    """clear the folder"""
+    import os
+    import shutil
+    if os.path.exists(path):
+        shutil.rmtree(path)
+    os.makedirs(path)
+
+def load_image(path:str, size:Tuple = None):
     """load image form given path and transform it to tensor
         input: path to the image, size of the image (H,W)
         output: a PIL image"""
@@ -96,17 +100,16 @@ def load_image(path:str, size:Tuple = None) -> Any:
         img = img.resize(size[::-1])
     return img
 
-def load_subfolder_as_label(root: str, loader = None, max_num = 1000) -> Tuple[List,List[int],List[str]]:
+def load_subfolder_as_label(root: str, loader = None, max_num = 1000):
     """load data from a folder, and use the subfolder name as label name
         input: path to the folder,
-               a loader(root,reldir,file), default to return reldir/file,
+               a loader(path), default to return path,
                max number of data to load per label
-        output: data, data_labels, label_names"""
+        output: datas, label_names"""
     import os
     if loader is None:
-        loader = lambda root,reldir,file: os.path.join(reldir,file)
+        loader = lambda path: path
     datas = []
-    labels = []
     label_names = []
     label_num = 0
     for dir, _, files in os.walk(root):
@@ -118,10 +121,10 @@ def load_subfolder_as_label(root: str, loader = None, max_num = 1000) -> Tuple[L
         for id, file in enumerate(files):
             if id >= max_num:
                 break
-            datas.append(loader(root, reldir, file))
-            labels.append(label_num)
+            data = loader(os.path.join(dir, file))
+            datas.append((data, label_num))
         label_num += 1
-    return datas, labels, label_names
+    return datas, label_names
 
 class ShuffledIterable:
     """shuffle the iterable"""
@@ -147,8 +150,10 @@ total_time = dict()
 def measure_time(func):
     """measure the time of a function"""
     import time
+    from functools import wraps
     global total_time
     total_time[func.__name__] = 0
+    @wraps(func)
     def wrapper(*args, **kwargs):
         start = time.time()
         result = func(*args, **kwargs)

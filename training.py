@@ -5,7 +5,7 @@
 import os
 import util.utility as ul
 from loss.loss import MyLoss
-from model.custom_model import Model
+from model.custom_model import CostomModel
 from config.configClass import Config
 import hyperparameter as p
 from tester.tester import Tester
@@ -27,7 +27,7 @@ def main(config:Config):
     """Main function of the script."""
 
     # setup model and other components
-    model = Model(config)                                                          # create model
+    model = CostomModel(config)                                                          # create model
     model.load_state_dict(torch.load(load_path))                                   # load model
     optimizer = AdamW(model.parameters(), lr=config.lr)                            # create optimizer
     scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=config.weight_decay)   # create scheduler

@@ -14,6 +14,8 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
+load_path = os.path.join(p.SAVED_MODELS_DIR, f"{p.infer_config.model_name}.pt")
+
 def main(config:Config, model_path:str) -> None:
     """Main function of the script."""
 
@@ -35,21 +37,8 @@ if __name__ == '__main__':
     # print version information
     print(f'Torch version: {torch.__version__}')
 
-    # find the save model path
-    save_model_path = ''
-    if len(argv) == 2:
-        save_model_path = argv[1]
-    else:
-        import os
-        all_model = os.listdir(p.SAVED_MODELS_DIR)
-        if '.gitkeep' in all_model:
-            all_model.remove('.gitkeep')
-        if len(all_model) == 0:
-            raise Exception("No model found in saved_models directory.")
-        save_model_path = os.path.join(p.SAVED_MODELS_DIR,all_model[0]) 
-
     # initialize
     ul.init(p.infer_config)
 
     # run main function
-    main(p.infer_config, save_model_path)
+    main(p.infer_config, load_path)
