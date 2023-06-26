@@ -4,7 +4,10 @@
 from typing import Dict, Any
 
 class Config:
-    """define a class to store the hyperparameters"""
+    """define a class to store the hyperparameters.
+    I modified the __getattr__ and __setattr__ method to make it more convenient to use.
+    But it is not a good idea to use it to store the hyperparameters.
+    Maybe some time later I will change it to just a dictionary."""
     def __init__(self, **kwargs):
         # set default values
         self.data:Dict[str,Any] = kwargs
@@ -24,10 +27,8 @@ class Config:
         else:
             self.data[name] = value
 
-    def to_wandb(self) -> None:
-        """add the config to wandb"""
-        import wandb
-        wandb.config.update(self.data)
+    def __delattr__(self, name: str) -> None:
+        del self.data[name]
 
     def update(self,config:"Config") -> None:
         """update the config"""

@@ -13,4 +13,4 @@ class MyLoss(nn.Module):
 
     def forward(self, output: Tensor, label: Tensor) -> Tensor:
         """forward function of loss"""
-        return NotImplemented
+        return NotImplementedError

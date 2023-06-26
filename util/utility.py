@@ -1,20 +1,23 @@
 
 """some tools for the project"""
 
+import os
+import sys
+import time
+import shutil
+import random
+import itertools
 import numpy as np
-import torch
-import torch.nn as nn
-import hyperparameter as p
+from typing import *
+from functools import wraps
 from config.configClass import Config
-from typing import List, Tuple, Dict, Any, Union, Optional
+import torch
+from torch.nn import Module
+from torch.optim import Optimizer
 
-def set_seed(seed: int) -> None:
+def set_seed(seed: int, cudnn_benchmark = False) -> None:
     """set seed for reproducibility"""
-    import torch
     from torch.backends import cudnn
-    import random
-    import numpy as np
-
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
@@ -22,51 +25,64 @@ def set_seed(seed: int) -> None:
     np.random.seed(seed)
     random.seed(seed)
     cudnn.deterministic = True
-    cudnn.benchmark = False
+    cudnn.benchmark = cudnn_benchmark
 
-def init(config:Config):
-    """Initialize the script."""
-    import os
-    import wandb
-    # create directory
-    os.makedirs(p.SAVED_MODELS_DIR, exist_ok=True)
-    # set float32 matmul precision
-    torch.set_float32_matmul_precision('high')
-    # set random seed
-    set_seed(seed=config.seed)
-    # initialize wandb
-    if hasattr(config,"WandB") and config.WandB:
-        wandb.init(project=config.project_name, name=config.model_name, config=config.data)
+def default_checkpoint(save_dir:str, model_name:str) -> str:
+    """return the default path of the checkpoint"""
+    return os.path.join(save_dir, model_name, f'checkpoint_{model_name}.pt')
 
-def show_result(config:Config, epoch:int, train_result:dict, valid_result:dict):
-    """Print result of training and validation."""
-    # print result
-    #import os
-    #os.system('clear')
-    print(f'Epoch: ({epoch} / {config.epochs})')
-    print("Train result:")
-    print(f'\ttrain_loss: {train_result["train_loss"]:0.4f}')
-    print("Valid result:")
-    for name,score in valid_result.items():
-        print(f'\t{name}: {score:0.4f}')
+def load_checkpoint(model:Module,
+                    optim:Optimizer = None,
+                    scheduler = None,
+                    checkpoint:str = None,
+                    device:torch.device = None) -> int:
+    """Load checkpoint."""
+    # load model
+    if checkpoint is None:
+        print('No checkpoint loaded.')
+        return 0
+    if not os.path.exists(checkpoint):
+        raise FileNotFoundError(f"File {checkpoint} does not exist.")
+    print(f'Loading checkpoint from {checkpoint}')
+    device = device if device is not None else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    checkpoint = torch.load(checkpoint, map_location=device)
+    epoch = checkpoint['epoch']
+    model.load_state_dict(checkpoint['model'])
+    if optim is not None:
+        optim.load_state_dict(checkpoint['optimizer'])
+    if scheduler is not None:
+        scheduler.load_state_dict(checkpoint['scheduler'])
+    return epoch
 
-def log_result(epoch:int, train_result:dict, valid_result:dict):
-    """log the result."""
-    import wandb
-    result = train_result.copy()
-    result.update(valid_result)
-    wandb.log(result)
+def save_checkpoint(epoch:int,
+                    model:Module,
+                    optim:Optimizer = None,
+                    scheduler = None,
+                    checkpoint:str = None,
+                    overwrite:bool = False) -> None:
+    """Save the checkpoint."""
+    if checkpoint is None:
+        print('No checkpoint saved.')
+        return
+    if os.path.exists(checkpoint) and not overwrite:
+        raise FileExistsError(f"File {checkpoint} already exists.")
+    dir = os.path.dirname(checkpoint)
+    os.makedirs(dir, exist_ok=True)
+    print(f'Saving model to {checkpoint}')
+    model_stat = model.state_dict()
+    optim_stat = optim.state_dict() if optim is not None else None
+    sched_stat = scheduler.state_dict() if scheduler is not None else None
+    torch.save({'epoch': epoch,
+                'model': model_stat,
+                'optimizer': optim_stat,
+                "scheduler": sched_stat},
+                  checkpoint)
 
-def store_model(config:Config, model:nn.Module, save_path = None):
-    """Store the model."""
-    import wandb
-    # save model
-    if save_path is None:
-        save_path = p.SAVED_MODELS_DIR + f"/{config.model_name}.pt"
-    print(f'Saving model to {save_path}')
-    torch.save(model.state_dict(), save_path)
-    if hasattr(config,"WandB") and config.WandB:
-        wandb.save(save_path)
+def get_cuda() -> torch.device:
+    if torch.cuda.is_available():
+        return torch.device('cuda')
+    else:
+        raise RuntimeError('No cuda device available.')
 
 def conv_output_size(input_size, kernel_size, stride = 1, padding = 0, dilation = 1) -> int:
     """calculate the output size of a convolutional layer"""
@@ -84,21 +100,9 @@ def conv_transpose_output_size(input_size, kernel_size, stride = 1, padding = 0,
 
 def clear_folder(path:str):
     """clear the folder"""
-    import os
-    import shutil
     if os.path.exists(path):
         shutil.rmtree(path)
     os.makedirs(path)
-
-def load_image(path:str, size:Tuple = None):
-    """load image form given path and transform it to tensor
-        input: path to the image, size of the image (H,W)
-        output: a PIL image"""
-    import PIL
-    img = PIL.Image.open(path, mode='r').convert('RGB')
-    if size is not None:
-        img = img.resize(size[::-1])
-    return img
 
 def load_subfolder_as_label(root: str, loader = None, max_num = 1000):
     """load data from a folder, and use the subfolder name as label name
@@ -106,9 +110,6 @@ def load_subfolder_as_label(root: str, loader = None, max_num = 1000):
                a loader(path), default to return path,
                max number of data to load per label
         output: datas, label_names"""
-    import os
-    if loader is None:
-        loader = lambda path: path
     datas = []
     label_names = []
     label_num = 0
@@ -121,10 +122,40 @@ def load_subfolder_as_label(root: str, loader = None, max_num = 1000):
         for id, file in enumerate(files):
             if id >= max_num:
                 break
-            data = loader(os.path.join(dir, file))
+            file_path = os.path.join(dir, file)
+            data = loader(file_path) if loader else file_path
             datas.append((data, label_num))
         label_num += 1
     return datas, label_names
+
+def plot_confusion_matrix(cm, class_names, path = None, title='Confusion matrix', normalize=False):
+    """plot the confusion matrix and save it to the given path if provided,
+        input: confusion matrix, classes, path to save the figure, title of the figure
+        output: None"""
+    import matplotlib.pyplot as plt
+    if normalize:
+        cm = cm.astype('float') / np.nansum(cm, axis=1, keepdims=True)
+        np.fill_diagonal(cm,np.nan)
+    plt.figure()
+    plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+    plt.title(title)
+    plt.colorbar()
+    tick_marks = np.arange(len(class_names))
+    plt.xticks(tick_marks, class_names, rotation=90)
+    plt.yticks(tick_marks, class_names)
+    fmt = '.1f'
+    thresh = cm.max() / 2.
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+            plt.text(j, i, format(cm[i, j]*100, fmt),
+                    horizontalalignment="center",
+                    color="white" if cm[i, j] > thresh else "black")
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    if path is not None:
+        plt.savefig(path)
+    plt.show()
+    plt.close()
 
 class ShuffledIterable:
     """shuffle the iterable"""
@@ -149,8 +180,6 @@ def shuffle(iterable):
 total_time = dict()
 def measure_time(func):
     """measure the time of a function"""
-    import time
-    from functools import wraps
     global total_time
     total_time[func.__name__] = 0
     @wraps(func)
@@ -165,61 +194,66 @@ def measure_time(func):
 def show_time():
     """show the time of each function"""
     global total_time
+    if len(total_time) == 0:
+        return
     print("Time:")
     for func_name, time in total_time.items():
-        print(f'\t{func_name}: {time:0.4f}')
+        print(f'\t{func_name}: {time:0.4f}s')
 
-class Result:
-    """handle the training result"""
-    def __init__(self, **results) -> None:
-        """input: a dict of result, key is the name of the result, value is the result or a list of result"""
-        self.sums: Dict[str,Any] = dict()
-        self.counts: Dict[str,int] = dict()
-        self.value: Dict[str,Any] = dict()
-        self.log(**results)
+class LogO(object):
+    """customized O for logging, it will print to the console and write to the log file"""
+    def __init__(self, path: str):
+        """input: path to the log file"""
+        self.terminal = sys.stdout
+        try:
+            self.log = open(path, "a")
+        except FileNotFoundError:
+            raise FileNotFoundError(f'Log file {path} not found')
 
-    def log(self, **results) -> None:
-        """add a result:
-        input: a dict of result, key is the name of the result, value is the result or a list of result"""
-        for key,value in results.items():
-            if key not in self.value.keys():
-                self.sums[key] = 0.
-                self.counts[key] = 0
-                self.value[key] = 0.
-            if isinstance(value, list):
-                self.sums[key] += sum(value)
-                self.counts[key] += len(value)
-                self.value[key] = value[-1]
-            else:
-                self.sums[key] += value
-                self.counts[key] += 1
-                self.value[key] = value
+    def close(self):
+        self.log.close()
 
-    def update(self, results: Dict[str,Any]) -> None:
-        """update a result:
-        input: a dict of result, key is the name of the result, value is the result or a list of result"""
-        self.log(**results)
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)
 
-    def __getitem__(self, key) -> list:
-        """get a result:
-        input: the name of the result,
-        output: a list of result"""
-        return self.value[key]
+    def flush(self):
+        self.terminal.flush()
+        self.log.flush()
 
-    def average(self, key: str) -> Any:
-        """get the average of a result:
-        input: the name of the result,
-        output: the average of the result"""
-        return self.sums[key]/self.counts[key]
+    def isatty(self):
+        return sys.__stdout__.isatty()
 
-    def sum(self, key: str) -> Any:
-        """get the sum of a result:
-        input: the name of the result,
-        output: the sum of the result"""
-        return self.sums[key]
+    def fileno(self):
+        return self.log.fileno()
 
-    def count(self, key: str) -> int:
-        """get the count of a result:
-        input: the name of the result,
-        output: the count of the result"""
-        return self.counts[key]
+    def __del__(self):
+        self.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.log.close()
+
+def write_to_log(content:str, path:str):
+    """write the content to the log file"""
+    with open(path, 'a') as f:
+        f.write(content)
+
+def logit(path:str = 'log.txt'):
+    """log what the function print to the log file, and print it to the console"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            import sys
+            original_stdout = sys.stdout
+            try:
+                with LogO(path) as f:
+                    sys.stdout = f
+                    result = func(*args, **kwargs)
+            finally:
+                sys.stdout = original_stdout
+            return result
+        return wrapper
+    return decorator
