@@ -23,7 +23,7 @@ def main(conf:Config) -> None:
     """Main function of the script."""
 
     # create model and load
-    model = CustomModel(conf)                                                      # create model
+    model = CustomModel(conf)                                                # create model
     ul.load_checkpoint(model, checkpoint=conf.load_path)                     # load model
     model.eval().to(conf.device)                                             # set model to eval mode
 
@@ -37,7 +37,7 @@ def main(conf:Config) -> None:
 
     # start inference
     post_fix = "color"
-    SAVE_INFER_DIR = os.path.join(INFER_DIR, conf.model_name, dataset_name)
+    SAVE_INFER_DIR = os.path.join(INFER_EX_DIR, conf.model_name, dataset_name)
     ERROR_DIR = os.path.join(SAVE_INFER_DIR, f"error_image_{post_fix}")
     ul.clear_folder(ERROR_DIR)
     total_count = 0

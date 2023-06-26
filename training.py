@@ -40,7 +40,7 @@ def start_train(conf:Config):
     """Main function of the script."""
 
     # setup model and other components
-    model = CustomModel(conf).to(conf.device)                                                     # create model
+    model = CustomModel(conf).to(conf.device)                                               # create model
     optimizer = AdamW(model.parameters(), lr=conf.lr)                                       # create optimizer
     scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=conf.gamma)                     # create scheduler
     criterion = nn.CrossEntropyLoss()                                                       # create criterion

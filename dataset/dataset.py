@@ -11,14 +11,14 @@ from hyperparameter import *
 from config.configClass import Config
 
 def load_hdf5(data_type: str, dataset_name: str) -> h5py.File:
-    return h5py.File(path.join(PROCESSED_DATA_DIR, data_type, dataset_name), "r")
+    return h5py.File(path.join(PROC_DATA_DIR, data_type, dataset_name), "r")
 
 def sample_saver(sample_dir ,input, label, label_names):
     """save transformed input and label to sample folder"""
     return None
 
 def save_samples(reader, data_type, transform = None, freq = 100, max_num = 1000):
-    TYPE_EX_DIR = path.join(DATA_EX_DIR, data_type)
+    TYPE_EX_DIR = path.join(TRAIN_EX_DIR, data_type)
     ul.clear_folder(TYPE_EX_DIR)
     label_names = eval(reader.attrs["label_names"])
     for idx, (input, label) in enumerate(reader['dataset']):

@@ -30,7 +30,7 @@ def save_data():
         print(f"Loading {type} data from raw datas")
         with mp.Pool(processes=mp.cpu_count()) as pool:
             inputs_labels = pool.starmap(data_loader, type_paths_labels)
-        TYPE_DIR = os.path.join(PROCESSED_DATA_DIR, type)
+        TYPE_DIR = os.path.join(PROC_DATA_DIR, type)
         DATASET_PATH = os.path.join(TYPE_DIR, dataset_name)
         print(f"Saving {type} data to {TYPE_DIR}......", end="  ")
         os.remove(DATASET_PATH) if os.path.exists(DATASET_PATH) else None
@@ -53,8 +53,9 @@ def data_saver(input, label, label_names) -> None:
 def sample_data():
     show_freq = 500
     for data_type in data_types:
-        EXAMPLE_FOLDER = os.path.join(PROCESSED_DATA_DIR, data_type, "example")
-        DATASET_PATH = os.path.join(PROCESSED_DATA_DIR, data_type, dataset_name)
+        TYPE_DIR = os.path.join(PROC_DATA_DIR, data_type)
+        EXAMPLE_FOLDER = os.path.join(TYPE_DIR, "example")
+        DATASET_PATH = os.path.join(TYPE_DIR, dataset_name)
         ul.clear_folder(EXAMPLE_FOLDER)
         with h5py.File(DATASET_PATH, mode='r') as reader:
             label_names = eval(reader.attrs["label_names"])
