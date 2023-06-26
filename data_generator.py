@@ -22,7 +22,7 @@ def data_loader(path, label) -> np.ndarray:
 #%%
 @ul.logit(LOG_CONSOLE)
 @ul.measure_time
-def save_data():
+def generate_process_data():
     RAW_DATA_PATH = os.path.join(RAW_DATA_DIR, raw_data_name)
     all_paths_labels, label_names = ul.load_subfolder_as_label(RAW_DATA_PATH, max_num=100000)
     types_paths_labels = data.random_split(all_paths_labels, data_ratios)
@@ -33,7 +33,7 @@ def save_data():
         TYPE_DIR = os.path.join(PROC_DATA_DIR, type)
         DATASET_PATH = os.path.join(TYPE_DIR, dataset_name)
         print(f"Saving {type} data to {TYPE_DIR}......", end="  ")
-        os.remove(DATASET_PATH) if os.path.exists(DATASET_PATH) else None
+        ul.clear_folder(TYPE_DIR)
         with h5py.File(DATASET_PATH, mode='w') as writer:
             writer.attrs["label_names"] = str(label_names)
             writer.attrs["length"] = len(type_paths_labels)
@@ -42,7 +42,7 @@ def save_data():
             for idx, input_label in enumerate(inputs_labels):
                 dataset[idx] = input_label
         print(f"Saving successfully!")
-save_data()
+generate_process_data()
 ul.show_time()
 
 #%%
@@ -50,13 +50,14 @@ def data_saver(input, label, label_names) -> None:
     return None
 
 @ul.logit(LOG_CONSOLE)
-def sample_data():
-    show_freq = 500
+def save_process_samples():
+    freq = 500
+    max_num = 100
     for data_type in data_types:
         TYPE_DIR = os.path.join(PROC_DATA_DIR, data_type)
-        EXAMPLE_FOLDER = os.path.join(TYPE_DIR, "example")
+        TYPE_EX_DIR = os.path.join(TYPE_DIR, "example")
         DATASET_PATH = os.path.join(TYPE_DIR, dataset_name)
-        ul.clear_folder(EXAMPLE_FOLDER)
+        ul.clear_folder(TYPE_EX_DIR)
         with h5py.File(DATASET_PATH, mode='r') as reader:
             label_names = eval(reader.attrs["label_names"])
             for id, name in enumerate(label_names):
@@ -64,9 +65,10 @@ def sample_data():
             length = reader.attrs['length']
             dataset = reader["dataset"]
             print(f"Data type: '{data_type}', total number: {length}")
-            for idx in range(0, length, show_freq):
-                input, label = dataset[idx]
+            for idx, (input, label) in enumerate(dataset):
+                if idx % freq != 0 or idx >= max_num*freq:
+                    continue
                 data_saver(input, label, label_names)
-sample_data()
+save_process_samples()
 
 # %%
