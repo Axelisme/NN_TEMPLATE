@@ -6,13 +6,15 @@ from torch import nn
 from torch import Tensor
 from config.configClass import Config
 
-class Model(nn.Module):
+
+class CustomModel(nn.Module):
     def __init__(self, conf:Config):
         """Initialize a neural network model."""
-        super(Model, self).__init__()
+        super(CustomModel, self).__init__()
+        self.conf = conf
 
     @torch.compile
     def forward(self, x:Tensor) -> Tensor:
         """Forward a batch of data through the model."""
-        return NotImplementedError
+        return NotImplemented
 

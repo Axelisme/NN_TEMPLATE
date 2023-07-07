@@ -2,11 +2,10 @@
 """define a class for the dataset"""
 
 import h5py
-import numpy as np
+from typing import Callable, Optional
 from os import path
-import torch
 import torch.utils.data as data
-import util.utility as ul
+from util.tool import clear_folder
 from hyperparameter import *
 from config.configClass import Config
 
@@ -19,7 +18,7 @@ def sample_saver(sample_dir ,input, label, label_names):
 
 def save_samples(reader, data_type, transform = None, freq = 100, max_num = 1000):
     TYPE_EX_DIR = path.join(TRAIN_EX_DIR, data_type)
-    ul.clear_folder(TYPE_EX_DIR)
+    clear_folder(TYPE_EX_DIR)
     label_names = eval(reader.attrs["label_names"])
     for idx, (input, label) in enumerate(reader['dataset']):
         if idx % freq != 0 or idx >= max_num*freq:
@@ -30,7 +29,7 @@ def save_samples(reader, data_type, transform = None, freq = 100, max_num = 1000
 
 class DataSet(data.Dataset):
     """define a class for the dataset"""
-    def __init__(self, conf: Config, data_type: str, dataset_name = "dataset.hdf5", transform = None):
+    def __init__(self, conf: Config, data_type: str, dataset_name = "dataset.hdf5", transform:Optional[Callable] = None):
         """initialize the dataset
             conf: the config object
             data_type: the type of the dataset, "train", "val" or "test"
@@ -50,7 +49,7 @@ class DataSet(data.Dataset):
         # load dataset attributes for __len__
         with load_hdf5(data_type, dataset_name)  as reader:
             self.length = reader.attrs["length"]
-            self.label_names = eval(reader.attrs["label_names"])
+            self.label_names = eval(reader.attrs["label_names"]) #type:ignore
 
         # save some samples of input and label
         save_samples(self.data_type, self.dataset_name, self.transform, freq = 100, max_num = 1000)
@@ -64,8 +63,9 @@ class DataSet(data.Dataset):
         # load file handler at first time of __getitem__
         if self.fileHandler is None:
             self._lazy_load()
-        input, label = self.dataset[idx]
-        input = self.transform(input)
+        input, label = self.dataset[idx]  # type:ignore
+        if self.transform is not None:
+            input = self.transform(input)
         return input, label
 
     def __len__(self):

@@ -1,0 +1,7 @@
+torch
+torchvision
+torchaudio
+torchmetrics
+tqdm
+wandb
+numpy

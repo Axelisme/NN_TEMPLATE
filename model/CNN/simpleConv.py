@@ -4,9 +4,9 @@
 import torch
 from torch import nn
 from torch import Tensor
-from torch.nn import functional as F
-import util.utility as ul
+from util.CNN import conv_output_size
 from config.configClass import Config
+
 
 class SimpleConv(nn.Module):
     def __init__(self, config:Config):
@@ -17,8 +17,8 @@ class SimpleConv(nn.Module):
 
         # conv1: 64*H1*W1
         self.Conv1_channel = 64
-        self.Conv1_height = ul.conv_output_size(ul.conv_output_size(self.input_height, 5), 2, 2)
-        self.Conv1_width  = ul.conv_output_size(ul.conv_output_size(self.input_width , 5), 2, 2)
+        self.Conv1_height = conv_output_size(conv_output_size(self.input_height, 5), 2, 2)
+        self.Conv1_width  = conv_output_size(conv_output_size(self.input_width , 5), 2, 2)
         self.Conv1 = nn.Sequential(
             nn.Conv2d(self.input_channel,
                         self.Conv1_channel,
@@ -34,8 +34,8 @@ class SimpleConv(nn.Module):
 
         # conv2: 64*H2*W2
         self.Conv2_channel = 64
-        self.Conv2_height = ul.conv_output_size(ul.conv_output_size(self.Conv1_height, 7), 2, 2)
-        self.Conv2_width  = ul.conv_output_size(ul.conv_output_size(self.Conv1_width , 7), 2, 2)
+        self.Conv2_height = conv_output_size(conv_output_size(self.Conv1_height, 7), 2, 2)
+        self.Conv2_width  = conv_output_size(conv_output_size(self.Conv1_width , 7), 2, 2)
         self.Conv2 = nn.Sequential(
             nn.Conv2d(self.Conv1_channel,
                         self.Conv2_channel,
@@ -51,8 +51,8 @@ class SimpleConv(nn.Module):
 
         # conv3: 128*H3*W3
         self.Conv3_channel = 128
-        self.Conv3_height = ul.conv_output_size(ul.conv_output_size(self.Conv2_height, 9), 2, 2)
-        self.Conv3_width  = ul.conv_output_size(ul.conv_output_size(self.Conv2_width , 9), 2, 2)
+        self.Conv3_height = conv_output_size(conv_output_size(self.Conv2_height, 9), 2, 2)
+        self.Conv3_width  = conv_output_size(conv_output_size(self.Conv2_width , 9), 2, 2)
         self.Conv3 = nn.Sequential(
             nn.Conv2d(self.Conv2_channel,
                         self.Conv3_channel,
@@ -83,4 +83,3 @@ class SimpleConv(nn.Module):
         x = self.flatten(x)
         x = self.Linear(x)
         return x.softmax(dim = 1)
-

@@ -2,29 +2,33 @@ import os
 import numpy as np
 from tqdm.auto import tqdm
 import torch
-from torch import nn
 from torchvision import transforms
 from dataset.dataset import DataSet
-import util.utility as ul
+from util.utility import set_seed, get_cuda
+from util.io import logit, plot_confusion_matrix
+from util.checkpoint import load_checkpoint
+from util.tool import clear_folder
 from hyperparameter import *
 from model.customModel import CustomModel
 from config.configClass import Config
 
+
 config = Config(
-    device = ul.get_cuda(),
+    device = get_cuda(),
     batch_size = 1,
 )
 config.update(base_config)
 
 #config.load_path = path.join(SAVED_MODELS_DIR, config.model_name, f"checkpoint_{config.model_name}_20.pt")
 
-@ul.logit(LOG_CONSOLE)
+
+@logit(LOG_CONSOLE)
 def main(conf:Config) -> None:
     """Main function of the script."""
 
     # create model and load
     model = CustomModel(conf)                                                # create model
-    ul.load_checkpoint(model, checkpoint=conf.load_path)                     # load model
+    load_checkpoint(model, checkpoint_path=conf.load_path)                     # load model
     model.eval().to(conf.device)                                             # set model to eval mode
 
     # prepare images
@@ -39,12 +43,12 @@ def main(conf:Config) -> None:
     post_fix = "color"
     SAVE_INFER_DIR = os.path.join(INFER_EX_DIR, conf.model_name, dataset_name)
     ERROR_DIR = os.path.join(SAVE_INFER_DIR, f"error_image_{post_fix}")
-    ul.clear_folder(ERROR_DIR)
+    clear_folder(ERROR_DIR)
     total_count = 0
     err_count = 0
     misclassified = np.zeros((conf.output_size,conf.output_size),dtype=np.float32)
     with torch.no_grad():
-        for input, label  in tqdm(test_dataset, desc="Inferencing"):
+        for input, label  in tqdm(test_dataset, desc="Inferencing"): #type:ignore
             total_count += 1
             output = model(input.to(conf.device).unsqueeze(0)).squeeze(0).cpu()
             misclassified[label] += output.squeeze(0).numpy()
@@ -65,7 +69,8 @@ def main(conf:Config) -> None:
     title = f"model: {conf.model_name}, dataset: {dataset_name}, data: {post_fix}"
     print(f"Plotting {title}...")
     CM_PATH = os.path.join(SAVE_INFER_DIR, f"CM_{post_fix}_err_{err_count/total_count*100:0.1f}.png")
-    ul.plot_confusion_matrix(cm=misclassified, class_names=label_names, path=CM_PATH, title=title, normalize=True)
+    plot_confusion_matrix(cm=misclassified, class_names=label_names, path=CM_PATH, title=title, normalize=True)
+
 
 def init(conf:Config) -> None:
     """Initialize the script."""
@@ -75,7 +80,8 @@ def init(conf:Config) -> None:
     torch.multiprocessing.set_start_method('forkserver', force=True)
     torch.set_float32_matmul_precision('medium')
     # set random seed
-    ul.set_seed(seed=conf.seed, cudnn_benchmark=True)
+    set_seed(seed=conf.seed, cudnn_benchmark=True)
+
 
 if __name__ == '__main__':
     # print version information

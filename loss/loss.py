@@ -1,9 +1,9 @@
 
 """define a class to compute loss"""
 
-import torch
 from torch import nn
 from torch import Tensor
+
 
 class MyLoss(nn.Module):
     """define a class to compute loss"""
@@ -13,4 +13,4 @@ class MyLoss(nn.Module):
 
     def forward(self, output: Tensor, label: Tensor) -> Tensor:
         """forward function of loss"""
-        return NotImplementedError
+        return NotImplemented

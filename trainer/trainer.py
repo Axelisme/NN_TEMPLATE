@@ -1,8 +1,8 @@
 
 """define a class for training a model"""
 
+from typing import Dict
 from tqdm.auto import tqdm
-import torch
 from torch import nn
 from torch import Tensor
 from torch.optim import Optimizer
@@ -10,7 +10,6 @@ from torch.utils.data import DataLoader
 from torchmetrics import MeanMetric, Metric
 import util.utility as ul
 from config.configClass import Config
-from typing import Mapping
 
 class Trainer:
     def __init__(self,
@@ -34,7 +33,7 @@ class Trainer:
         self.criterion = criterion
         self.statistic = statistic
 
-    def train(self) -> Metric:
+    def train(self) -> Dict[str, Tensor]:
         '''train a model for one epoch:
         output: dict('train_loss', loss), the loss of this epoch'''
         # move model to device

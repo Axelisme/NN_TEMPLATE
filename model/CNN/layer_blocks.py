@@ -4,6 +4,7 @@
 from torch import nn
 from torch import Tensor
 
+
 # 1x1 convolution
 class Conv1x1(nn.Module):
     """A 1x1 convolution."""
@@ -15,6 +16,7 @@ class Conv1x1(nn.Module):
     def forward(self, x:Tensor) -> Tensor:
         return self.conv(x)
 
+
 # 3x3 convolution
 class Conv3x3(nn.Module):
     """A 3x3 convolution with padding."""
@@ -25,6 +27,7 @@ class Conv3x3(nn.Module):
 
     def forward(self, x:Tensor) -> Tensor:
         return self.conv(x)
+
 
 # Residual block
 class ResidualBlock(nn.Module):

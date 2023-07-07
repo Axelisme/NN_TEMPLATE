@@ -6,8 +6,10 @@ import h5py
 import numpy as np
 import torch.utils.data as data
 import multiprocessing as mp
-import util.utility as ul
+from util.io import logit
+from util.tool import measure_time, show_time, clear_folder, load_subfolder_as_label
 from hyperparameter import *
+
 
 raw_data_name = "raw_data_name"
 dataset_name = "dataset.hdf5"
@@ -16,24 +18,26 @@ data_ratios = base_config.data_ratio
 
 mydtype = np.dtype([("input", np.uint8, (1,)), ("label", np.uint8)])
 
+
 def data_loader(path, label) -> np.ndarray:
-    return 0, label
+    return np.zeros((1,1), dtype=mydtype)
+
 
 #%%
-@ul.logit(LOG_CONSOLE)
-@ul.measure_time
+@logit(LOG_CONSOLE)
+@measure_time
 def generate_process_data():
     RAW_DATA_PATH = os.path.join(RAW_DATA_DIR, raw_data_name)
-    all_paths_labels, label_names = ul.load_subfolder_as_label(RAW_DATA_PATH, max_num=100000)
-    types_paths_labels = data.random_split(all_paths_labels, data_ratios)
+    all_paths_labels, label_names = load_subfolder_as_label(RAW_DATA_PATH, max_num=100000)
+    types_paths_labels = data.random_split(all_paths_labels, data_ratios) #type:ignore
     for type, type_paths_labels in zip(data_types, types_paths_labels):
         print(f"Loading {type} data from raw datas")
         with mp.Pool(processes=mp.cpu_count()) as pool:
-            inputs_labels = pool.starmap(data_loader, type_paths_labels)
+            inputs_labels = pool.starmap(data_loader, type_paths_labels) #type:ignore
         TYPE_DIR = os.path.join(PROC_DATA_DIR, type)
         DATASET_PATH = os.path.join(TYPE_DIR, dataset_name)
         print(f"Saving {type} data to {TYPE_DIR}......", end="  ")
-        ul.clear_folder(TYPE_DIR)
+        clear_folder(TYPE_DIR)
         with h5py.File(DATASET_PATH, mode='w') as writer:
             writer.attrs["label_names"] = str(label_names)
             writer.attrs["length"] = len(type_paths_labels)
@@ -43,13 +47,15 @@ def generate_process_data():
                 dataset[idx] = input_label
         print(f"Saving successfully!")
 generate_process_data()
-ul.show_time()
+show_time()
+
 
 #%%
 def data_saver(input, label, label_names) -> None:
     return None
 
-@ul.logit(LOG_CONSOLE)
+
+@logit(LOG_CONSOLE)
 def save_process_samples():
     freq = 500
     max_num = 100
@@ -57,18 +63,16 @@ def save_process_samples():
         TYPE_DIR = os.path.join(PROC_DATA_DIR, data_type)
         TYPE_EX_DIR = os.path.join(TYPE_DIR, "example")
         DATASET_PATH = os.path.join(TYPE_DIR, dataset_name)
-        ul.clear_folder(TYPE_EX_DIR)
+        clear_folder(TYPE_EX_DIR)
         with h5py.File(DATASET_PATH, mode='r') as reader:
-            label_names = eval(reader.attrs["label_names"])
+            label_names = eval(reader.attrs["label_names"]) #type:ignore
             for id, name in enumerate(label_names):
                 print(f"Label {id}: {name}")
             length = reader.attrs['length']
             dataset = reader["dataset"]
             print(f"Data type: '{data_type}', total number: {length}")
-            for idx, (input, label) in enumerate(dataset):
+            for idx, (input, label) in enumerate(dataset): #type:ignore
                 if idx % freq != 0 or idx >= max_num*freq:
                     continue
                 data_saver(input, label, label_names)
 save_process_samples()
-
-# %%

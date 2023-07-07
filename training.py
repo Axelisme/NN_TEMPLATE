@@ -9,23 +9,25 @@ from torch import nn
 from torch.optim import AdamW
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
-import torchmetrics as tm
 import torchmetrics.classification as cf
-import util.utility as ul
+from util.utility import get_cuda, set_seed
+from util.tool import measure_time, show_time
+from util.io import logit
+from util.checkpoint import load_checkpoint, save_checkpoint
 from hyperparameter import *
-from loss.loss import MyLoss
 from model.customModel import CustomModel
 from tester.tester import Tester
 from dataset.dataset import DataSet
 from trainer.trainer import Trainer
 from config.configClass import Config
 
+
 config = Config(
     batch_size = 8,
     epochs = 5,
     lr = 3e-4,
     gamma = 0.95,
-    device = ul.get_cuda(),
+    device = get_cuda(),
     num_workers = 2,
     WandB = False
 )
@@ -34,8 +36,9 @@ config.update(base_config)
 config.load_path = None
 config.save_path = None
 
-#@ul.logit(LOG_CONSOLE)
-@ul.measure_time
+
+#@logit(LOG_CONSOLE)
+@measure_time
 def start_train(conf:Config):
     """Main function of the script."""
 
@@ -45,7 +48,7 @@ def start_train(conf:Config):
     scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=conf.gamma)                     # create scheduler
     criterion = nn.CrossEntropyLoss()                                                       # create criterion
     evaluator = cf.MulticlassAccuracy(num_classes=conf.output_size, average='macro')        # create evaluator1
-    ul.load_checkpoint(model, optimizer, scheduler, checkpoint=conf.load_path, device=conf.device)     # load model and optimizer
+    load_checkpoint(model, optimizer, scheduler, checkpoint_path=conf.load_path, device=conf.device)     # load model and optimizer
 
     # register model to wandb
     if conf.WandB and not hasattr(conf,"Sweep"):
@@ -88,8 +91,9 @@ def start_train(conf:Config):
         cur_score = next(iter(valid_result.values())).item()
         scheduler.step()                                                                # update learning rate
         if cur_score > best_score:                                                      # save best model
-            ul.save_checkpoint(epoch, model, optimizer, scheduler, checkpoint=conf.save_path, overwrite=True)
+            save_checkpoint(epoch, model, optimizer, scheduler, checkpoint_path=conf.save_path, overwrite=True)
             best_score = cur_score
+
 
 def init(conf:Config) -> None:
     """Initialize the script."""
@@ -99,11 +103,12 @@ def init(conf:Config) -> None:
     torch.multiprocessing.set_start_method('forkserver', force=True)
     torch.set_float32_matmul_precision('medium')
     # set random seed
-    ul.set_seed(seed=conf.seed, cudnn_benchmark=True)
+    set_seed(seed=conf.seed, cudnn_benchmark=True)
     # initialize wandb
     if hasattr(conf,"WandB") and conf.WandB:
         wandb.init(project=conf.project_name, name=conf.model_name, config=conf.data)
         wandb.config.update(conf.data)
+
 
 def show_result(conf:Config, epoch, train_result, valid_result:dict, lr) -> None:
     """Print result of training and validation."""
@@ -116,6 +121,7 @@ def show_result(conf:Config, epoch, train_result, valid_result:dict, lr) -> None
     for name, evaluator in valid_result.items():
         print(f'\t{name}: {evaluator:0.4f}')
 
+
 if __name__ == '__main__':
     #%% print information
     print(f'Torch version: {torch.__version__}')
@@ -123,4 +129,4 @@ if __name__ == '__main__':
 
     #%% start training
     start_train(config)
-    ul.show_time()
+    show_time()

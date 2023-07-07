@@ -3,6 +3,7 @@
 
 from typing import Dict, Any
 
+
 class Config:
     """define a class to store the hyperparameters.
     I modified the __getattr__ and __setattr__ method to make it more convenient to use.

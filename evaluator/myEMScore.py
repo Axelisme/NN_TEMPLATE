@@ -6,6 +6,7 @@ from torch import Tensor
 from torchmetrics import Metric
 from typing import Optional
 
+
 class MyEMScore(Metric):
     """define a class to calculate exact match score"""
     is_differentiable: Optional[bool] = None
