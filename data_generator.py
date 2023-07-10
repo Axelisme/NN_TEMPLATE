@@ -14,7 +14,7 @@ from hyperparameter import *
 raw_data_name = "raw_data_name"
 dataset_name = "dataset.hdf5"
 data_types = ["train", "valid", "test"]
-data_ratios = base_config.data_ratio
+data_ratios = base_conf.data_ratio
 
 mydtype = np.dtype([("input", np.uint8, (1,)), ("label", np.uint8)])
 
@@ -24,7 +24,7 @@ def data_loader(path, label) -> np.ndarray:
 
 
 #%%
-@logit(LOG_CONSOLE)
+@logit(LOG_FILE)
 @measure_time
 def generate_process_data():
     RAW_DATA_PATH = os.path.join(RAW_DATA_DIR, raw_data_name)
@@ -55,7 +55,7 @@ def data_saver(input, label, label_names) -> None:
     return None
 
 
-@logit(LOG_CONSOLE)
+@logit(LOG_FILE)
 def save_process_samples():
     freq = 500
     max_num = 100

@@ -1,36 +1,44 @@
 
 """define a class to store the hyperparameters"""
 
-from typing import Dict, Any
+import yaml
+from typing import Dict, Any, Optional
 
 
 class Config:
-    """define a class to store the hyperparameters.
-    I modified the __getattr__ and __setattr__ method to make it more convenient to use.
-    But it is not a good idea to use it to store the hyperparameters.
-    Maybe some time later I will change it to just a dictionary."""
-    def __init__(self, **kwargs):
-        # set default values
-        self.data:Dict[str,Any] = kwargs
+    """define a class to store the hyperparameters."""
+    def __init__(self, yaml_path:Optional[str] = None):
+        if yaml_path is not None:
+            self.load_yaml(yaml_path)
 
-    def __getattr__(self, name):
-        try:
-            if name == 'data':
-                return super().__getattr__(name) # type: ignore
-            else:
-                return self.data[name]
-        except KeyError:
-            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+    def load_dict(self, data_dict:Dict[str,Any]) -> "Config":
+        """load from dict"""
+        for key, value in data_dict.items():
+            if isinstance(value, Dict):
+                value = Config().load_dict(value)
+            self.__setattr__(key, value)
+        return self
 
-    def __setattr__(self, name, value):
-        if name == 'data':
-            super().__setattr__(name, value)
-        else:
-            self.data[name] = value
+    def as_dict(self) -> Dict[str,Any]:
+        """return as dict"""
+        return {key: value.as_dict() if isinstance(value, Config) else value
+                for key, value in self.__dict__.items()}
 
-    def __delattr__(self, name: str) -> None:
-        del self.data[name]
+    def load_yaml(self, yaml_path:str) -> "Config":
+        """load from yaml file"""
+        with open(yaml_path, 'r') as f:
+            yaml_data = yaml.load(f, Loader=yaml.Loader)
+        return self.load_dict(yaml_data)
 
-    def update(self,config:"Config") -> None:
-        """update the config"""
-        self.data.update(config.data)
+    def load_config(self, config:"Config") -> "Config":
+        """load from another config"""
+        return self.load_dict(config.as_dict())
+
+    def __str__(self) -> str:
+        return str(self.as_dict())
+
+    def __getattr__(self, __name: str) -> Any: # make pylint happy
+        return super().__getattribute__(__name)
+
+    def __setattr__(self, name: str, value: Any) -> None: # make pylint happy
+        super().__setattr__(name, value)

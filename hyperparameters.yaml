@@ -1,0 +1,23 @@
+base:
+  project_name : 'Template'
+  model_name   : 'Version_1'
+  dataset_name : "dataset_all.hdf5"  # prefix : PROC_DATA_DIR/data_type
+  seed         : 42
+  data_ratio   : [0.8, 0.1, 0.1]
+  input_size   : [3, 224, 224]
+  output_size  : 8
+  #load_path    : ~
+  #save_path    : ~
+
+train:
+  device      : "cuda:0"
+  batch_size  : 8
+  epochs      : 5
+  lr          : 0.0003
+  gamma       : 0.95
+  num_workers : 2
+  WandB       : False
+
+infer:
+  device      : "cuda:0"
+  batch_size  : 1

@@ -5,3 +5,4 @@ torchmetrics
 tqdm
 wandb
 numpy
+pyyaml

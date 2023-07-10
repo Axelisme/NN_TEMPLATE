@@ -7,14 +7,14 @@ from torchmetrics import Metric
 from typing import Optional
 
 
-class MyEMScore(Metric):
+class CustomEMScore(Metric):
     """define a class to calculate exact match score"""
     is_differentiable: Optional[bool] = None
     higher_is_better: Optional[bool] = True
     full_state_update: bool = False
 
     def __init__(self):
-        super(MyEMScore, self).__init__()
+        super(CustomEMScore, self).__init__()
         self.add_state("correct", default=torch.tensor(0), dist_reduce_fx="sum")
         self.add_state("total", default=torch.tensor(0), dist_reduce_fx="sum")
 

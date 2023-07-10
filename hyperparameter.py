@@ -13,17 +13,19 @@ PROC_DATA_DIR      = path.join(DATA_DIR, 'processed')                     # Path
 TRAIN_EX_DIR       = path.join(DATA_DIR, 'training_data')                 # Path to the training examples directory
 INFER_EX_DIR       = path.join(DATA_DIR, 'inference_data')                # Path to the inference examples directory
 SAVED_MODELS_DIR   = path.join(DATA_DIR, 'saved_models')                  # Path to the saved models directory
-LOG_CONSOLE        = path.join(DATA_DIR, 'log.txt')                       # Path to the log file
+LOG_FILE           = path.join(DATA_DIR, 'log.txt')                       # Path to the log file
 
 
 # create config
-base_config = Config(
-    project_name = 'Template',
-    model_name = 'Version_1',
-    seed = 0,
-    data_ratio = (0.8, 0.1, 0.1),  #train, val, test
-    input_size = (3, 224, 224),    #channel, height, width
-    output_size = 8,
-)
-base_config.load_path = default_checkpoint(SAVED_MODELS_DIR, base_config.model_name)
-base_config.save_path = default_checkpoint(SAVED_MODELS_DIR, base_config.model_name)
+all_conf = Config(yaml_path='hyperparameters.yaml')
+base_conf = all_conf.base
+train_conf = all_conf.train
+infer_conf = all_conf.infer
+
+if not hasattr(base_conf, 'load_path'):
+    base_conf.load_path = default_checkpoint(SAVED_MODELS_DIR, base_conf.model_name)
+if not hasattr(base_conf, 'save_path'):
+    base_conf.save_path = default_checkpoint(SAVED_MODELS_DIR, base_conf.model_name)
+
+train_conf.load_config(base_conf)
+infer_conf.load_config(base_conf)

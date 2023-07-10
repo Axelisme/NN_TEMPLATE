@@ -27,7 +27,7 @@ def save_samples(reader, data_type, transform = None, freq = 100, max_num = 1000
             input = transform(input)
         sample_saver(TYPE_EX_DIR, input, label, label_names)
 
-class DataSet(data.Dataset):
+class CustomDataSet(data.Dataset):
     """define a class for the dataset"""
     def __init__(self, conf: Config, data_type: str, dataset_name = "dataset.hdf5", transform:Optional[Callable] = None):
         """initialize the dataset
@@ -36,7 +36,7 @@ class DataSet(data.Dataset):
             dataset_name: the name of the dataset file
             transform: the transform function of the input
         """
-        super(DataSet, self).__init__()
+        super(CustomDataSet, self).__init__()
         self.conf = conf
         self.data_type = data_type
         self.dataset_name = dataset_name
@@ -62,7 +62,7 @@ class DataSet(data.Dataset):
     def __getitem__(self, idx):
         # load file handler at first time of __getitem__
         if self.fileHandler is None:
-            self._lazy_load()
+            self.__lazy_load()
         input, label = self.dataset[idx]  # type:ignore
         if self.transform is not None:
             input = self.transform(input)
@@ -71,7 +71,7 @@ class DataSet(data.Dataset):
     def __len__(self):
         return self.length
 
-    def _lazy_load(self):
+    def __lazy_load(self):
         if self.fileHandler is None:
             self.fileHandler = load_hdf5(self.data_type, self.dataset_name)
             self.dataset = self.fileHandler["dataset"]

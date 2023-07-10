@@ -10,31 +10,16 @@ from torch.optim import AdamW
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 import torchmetrics.classification as cf
-from util.utility import get_cuda, set_seed
+from util.utility import init
 from util.tool import measure_time, show_time
 from util.io import logit
 from util.checkpoint import load_checkpoint, save_checkpoint
 from hyperparameter import *
 from model.customModel import CustomModel
 from tester.tester import Tester
-from dataset.dataset import DataSet
+from dataset.customDataset import CustomDataSet
 from trainer.trainer import Trainer
 from config.configClass import Config
-
-
-config = Config(
-    batch_size = 8,
-    epochs = 5,
-    lr = 3e-4,
-    gamma = 0.95,
-    device = get_cuda(),
-    num_workers = 2,
-    WandB = False
-)
-config.update(base_config)
-
-config.load_path = None
-config.save_path = None
 
 
 #@logit(LOG_CONSOLE)
@@ -43,12 +28,16 @@ def start_train(conf:Config):
     """Main function of the script."""
 
     # setup model and other components
-    model = CustomModel(conf).to(conf.device)                                               # create model
+    model = CustomModel(conf).to(torch.device(conf.device))                                 # create model
     optimizer = AdamW(model.parameters(), lr=conf.lr)                                       # create optimizer
     scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=conf.gamma)                     # create scheduler
     criterion = nn.CrossEntropyLoss()                                                       # create criterion
     evaluator = cf.MulticlassAccuracy(num_classes=conf.output_size, average='macro')        # create evaluator1
-    load_checkpoint(model, optimizer, scheduler, checkpoint_path=conf.load_path, device=conf.device)     # load model and optimizer
+    load_checkpoint(model,
+                    optimizer,
+                    scheduler,
+                    checkpoint_path=conf.load_path,
+                    device=torch.device(conf.device))     # load model and optimizer
 
     # register model to wandb
     if conf.WandB and not hasattr(conf,"Sweep"):
@@ -56,8 +45,8 @@ def start_train(conf:Config):
 
     # prepare dataset and dataloader
     dataset_name = "dataset_all.hdf5"
-    train_set = DataSet(conf, "train", dataset_name)    # create train dataset
-    valid_set = DataSet(conf, "valid", dataset_name)    # create valid dataset
+    train_set = CustomDataSet(conf, "train", dataset_name)    # create train dataset
+    valid_set = CustomDataSet(conf, "valid", dataset_name)    # create valid dataset
     train_loader = DataLoader(dataset=train_set,
                               batch_size=conf.batch_size,
                               shuffle=False,
@@ -95,21 +84,6 @@ def start_train(conf:Config):
             best_score = cur_score
 
 
-def init(conf:Config) -> None:
-    """Initialize the script."""
-    # create directory
-    os.makedirs(SAVED_MODELS_DIR, exist_ok=True)
-    # set float32 matmul precision
-    torch.multiprocessing.set_start_method('forkserver', force=True)
-    torch.set_float32_matmul_precision('medium')
-    # set random seed
-    set_seed(seed=conf.seed, cudnn_benchmark=True)
-    # initialize wandb
-    if hasattr(conf,"WandB") and conf.WandB:
-        wandb.init(project=conf.project_name, name=conf.model_name, config=conf.data)
-        wandb.config.update(conf.data)
-
-
 def show_result(conf:Config, epoch, train_result, valid_result:dict, lr) -> None:
     """Print result of training and validation."""
     # print result
@@ -125,8 +99,12 @@ def show_result(conf:Config, epoch, train_result, valid_result:dict, lr) -> None
 if __name__ == '__main__':
     #%% print information
     print(f'Torch version: {torch.__version__}')
-    init(config)
+    init(train_conf.seed)
+    if hasattr(train_conf,"WandB") and train_conf.WandB:
+        wandb.init(project=train_conf.project_name,
+                   name=train_conf.model_name,
+                   config=train_conf.data)
 
     #%% start training
-    start_train(config)
+    start_train(train_conf)
     show_time()
