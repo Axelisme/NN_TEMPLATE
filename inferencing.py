@@ -7,7 +7,7 @@ from dataset.customDataset import CustomDataSet
 from util.utility import init
 from util.io import logit
 from util.checkpoint import load_checkpoint
-from hyperparameter import *
+from hyperparameters import *
 from model.customModel import CustomModel
 from config.configClass import Config
 

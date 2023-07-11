@@ -6,3 +6,4 @@ tqdm
 wandb
 numpy
 pyyaml
+h5py

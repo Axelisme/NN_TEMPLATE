@@ -14,7 +14,7 @@ from util.utility import init
 from util.tool import measure_time, show_time
 from util.io import logit
 from util.checkpoint import load_checkpoint, save_checkpoint
-from hyperparameter import *
+from hyperparameters import *
 from model.customModel import CustomModel
 from tester.tester import Tester
 from dataset.customDataset import CustomDataSet

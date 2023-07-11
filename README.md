@@ -1,7 +1,7 @@
 # NEURAL NETWORK TEMPLATE
 
 Dependence: `torch`, `tqdm`, `torchmetric`, `wandb`, `numpy`,`pyyaml`   
-Optional: `pandas`, `matplotlib`, `scikit-learn`
+Optional: `pandas`, `matplotlib`, `scikit-learn`, `h5py`
 
 實作功能：
 1. 簡單的Evaluator

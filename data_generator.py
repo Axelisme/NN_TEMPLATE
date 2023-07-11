@@ -8,7 +8,7 @@ import torch.utils.data as data
 import multiprocessing as mp
 from util.io import logit
 from util.tool import measure_time, show_time, clear_folder, load_subfolder_as_label
-from hyperparameter import *
+from hyperparameters import *
 
 
 raw_data_name = "raw_data_name"

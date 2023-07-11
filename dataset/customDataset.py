@@ -6,7 +6,7 @@ from typing import Callable, Optional
 from os import path
 import torch.utils.data as data
 from util.tool import clear_folder
-from hyperparameter import *
+from hyperparameters import *
 from config.configClass import Config
 
 def load_hdf5(data_type: str, dataset_name: str) -> h5py.File:
