@@ -1,6 +1,7 @@
 
 """define a class to compute loss"""
 
+import torch
 from torch import nn
 from torch import Tensor
 
@@ -11,6 +12,7 @@ class CustomLoss(nn.Module):
         """initialize a loss instance"""
         super(CustomLoss, self).__init__()
 
+    @torch.compile()
     def forward(self, output: Tensor, label: Tensor) -> Tensor:
         """forward function of loss"""
         return NotImplemented

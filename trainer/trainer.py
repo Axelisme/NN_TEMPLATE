@@ -3,6 +3,7 @@
 
 from typing import Dict
 from tqdm.auto import tqdm
+import torch
 from torch import nn
 from torch import Tensor
 from torch.optim import Optimizer
@@ -27,7 +28,7 @@ class Trainer:
                 criterion: the criterion of this model,
                 statistic: the statistic method of the loss for each batch'''
         self.model = model
-        self.device = config.device
+        self.device = torch.device(config.device)
         self.train_loader = loader
         self.optimizer = optimizer
         self.criterion = criterion

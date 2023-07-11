@@ -1,11 +1,20 @@
 """
 This file contains functions for input and output
 """
+import os
 import sys
+import shutil
 from functools import wraps
 import numpy as np
 import matplotlib.pyplot as plt
 import itertools
+
+
+def clear_folder(path:str):
+    """clear the folder"""
+    if os.path.exists(path):
+        shutil.rmtree(path)
+    os.makedirs(path)
 
 
 class LogO(object):

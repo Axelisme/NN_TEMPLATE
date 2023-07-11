@@ -4,7 +4,10 @@ base:  # base hyperparameters
   dataset_name     : "dataset.hdf5"       # prefix : PROC_DATA_DIR/data_type
   seed             : 0
   device           : "cuda:0"
-  data_ratio       : [0.8, 0.1, 0.1]      # train, valid, test
+  split_ratio      :
+    train            : 0.8
+    valid            : 0.1
+    test             : 0.1
   input_size       : [1, 80, 80]          # input [channel, height, width]
   output_size      : [1, 80, 80]          # output [channel, height, width]
   load_path        : ~                    # if not set this parameter, will use default path: {SAVED_MODEL_DIR}/{model_name}/checkpoint_{model_name}.pt

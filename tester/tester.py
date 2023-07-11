@@ -23,7 +23,7 @@ class Tester:
                loader: the dataloader of test set,
                evaluators: the evaluator collection to use'''
         self.model = model
-        self.device = config.device
+        self.device = torch.device(config.device)
         self.test_loader = loader
         self.criterion = criterion
         self.loss_statistic = MeanMetric()

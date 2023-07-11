@@ -17,7 +17,7 @@ def load_checkpoint(model:Module,
                     optim:Optional[Optimizer] = None,
                     scheduler = None,
                     checkpoint_path:Optional[str] = None,
-                    device:torch.device = torch.device("cuda")) -> int:
+                    device:Optional[torch.device] = None) -> int:
     """Load checkpoint."""
     # load model
     if checkpoint_path is None:
@@ -26,10 +26,12 @@ def load_checkpoint(model:Module,
     if not os.path.exists(checkpoint_path):
         raise FileNotFoundError(f"File {checkpoint_path} does not exist.")
     print(f'Loading checkpoint from {checkpoint_path}')
-    device = device if device is not None else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if device is None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     checkpoint = torch.load(checkpoint_path, map_location=device)
     epoch = checkpoint['epoch']
     model.load_state_dict(checkpoint['model'])
+    model.to(device)
     if optim is not None:
         optim.load_state_dict(checkpoint['optimizer'])
     if scheduler is not None:

@@ -13,7 +13,7 @@ class CustomModel(nn.Module):
         super(CustomModel, self).__init__()
         self.conf = conf
 
-    #@torch.compile
+    @torch.compile
     def forward(self, x:Tensor) -> Tensor:
         """Forward a batch of data through the model."""
         return NotImplemented
