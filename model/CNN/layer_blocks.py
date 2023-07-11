@@ -51,7 +51,7 @@ class ResidualBlock(nn.Module):
         out = self.conv2(out)
         out = self.bn2(out)
         if self.downsample:
-            residual = self.downsample(x)
+            residual = self.downsample(residual)
         out += residual
         out = self.relu(out)
         return out

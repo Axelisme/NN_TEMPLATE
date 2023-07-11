@@ -8,7 +8,7 @@ import model.CNN.layer_blocks as lb
 
 
 class ResNet(nn.Module):
-    def __init__(self, in_channel, layers, num_classes=10):
+    def __init__(self, in_channel, num_classes=10):
         super(ResNet, self).__init__()
         self.conv = lb.Conv3x3(in_channel, 16)
         self.bn = nn.BatchNorm2d(16)
