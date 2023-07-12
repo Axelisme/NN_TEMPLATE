@@ -7,7 +7,7 @@ import numpy as np
 from typing import Dict, List
 from torch.utils.data import random_split, RandomSampler, BatchSampler
 from util.io import clear_folder
-from hyperparameters import *
+from hyperparameters import base_conf, PROC_DATA_DIR
 
 # some parameters
 dataset_name = base_conf.dataset_name

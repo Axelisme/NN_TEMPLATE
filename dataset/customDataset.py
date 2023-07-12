@@ -5,7 +5,7 @@ import os
 import h5py
 from typing import Callable, Optional
 import torch.utils.data as data
-from hyperparameters import *
+from hyperparameters import PROC_DATA_DIR
 from config.configClass import Config
 
 def load_processed_dataset(data_name: str, file_name: str) -> h5py.File:

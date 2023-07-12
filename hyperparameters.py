@@ -2,7 +2,6 @@
 
 #%%
 from os import path
-from util.checkpoint import default_checkpoint
 from config.configClass import Config
 
 
@@ -21,11 +20,6 @@ all_conf = Config(yaml_path='hyperparameters.yaml')
 base_conf  = Config(data=all_conf.base)
 train_conf = Config(data=all_conf.train)
 infer_conf = Config(data=all_conf.infer)
-
-if not hasattr(base_conf, 'load_path'):
-    base_conf.load_path = default_checkpoint(SAVED_MODELS_DIR, base_conf.model_name)
-if not hasattr(base_conf, 'save_path'):
-    base_conf.save_path = default_checkpoint(SAVED_MODELS_DIR, base_conf.model_name)
 
 train_conf.load_config(base_conf)
 infer_conf.load_config(base_conf)

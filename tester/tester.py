@@ -7,7 +7,7 @@ import torch
 from torch import nn
 from torch import Tensor
 from torch.utils.data import DataLoader
-from torchmetrics import Metric, MetricCollection, MeanMetric
+from torchmetrics import Metric, MetricCollection
 
 class Tester:
     def __init__(self,

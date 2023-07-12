@@ -11,43 +11,37 @@ from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 import torchmetrics.classification as cf
 from util.utility import init
-from util.checkpoint import load_checkpoint, save_checkpoint
-from hyperparameters import *
+from hyperparameters import train_conf
 from model.customModel import CustomModel
 from evaluator.Loss2evaluator import LossScore
 from tester.tester import Tester
 from dataset.customDataset import CustomDataSet
 from trainer.trainer import Trainer
 from config.configClass import Config
+from ckptmanager.manager import CheckPointManager
 
 
 def start_train(conf:Config):
-    """Main function of the script."""
+    """Training model base on given config."""
 
     # device setting
     device = torch.device(conf.device)
 
-
     # setup model and other components
     model = CustomModel(conf)                                                               # create model
-    optimizer = AdamW(model.parameters(), lr=conf.lr)                                       # create optimizer
+    optimizer = AdamW(model.parameters(), lr=conf.init_lr)                                  # create optimizer
     scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=conf.gamma)                     # create scheduler
     criterion = nn.CrossEntropyLoss()                                                       # create criterion
-    evaluator = cf.MulticlassAccuracy(num_classes=conf.output_size, average='macro')        # create evaluator1
-    if conf.load_path is not None:   # load model and optimizer from checkpoint if needed
-        load_checkpoint(model     = model,
-                        ckpt_path = conf.load_path,
-                        optim     = optimizer,
-                        scheduler = scheduler,
-                        device    = device)
-    else:
-        print("No checkpoint loaded.")
+    evaluator = cf.MulticlassAccuracy(num_classes=conf.output_size, average='macro')        # create evaluator
 
+    # load model and optimizer from checkpoint if needed
+    ckpt_manager = CheckPointManager(conf, model, optim=optimizer, scheduler=scheduler)
+    if conf.Load:
+        ckpt_manager.load(ckpt_path=conf.load_path, device=device)
 
     # register model to wandb if needed
     if conf.WandB and not hasattr(conf,"Sweep"):
         wandb.watch(models=model, criterion=criterion, log="gradients", log_freq=100)
-
 
     # prepare dataset and dataloader
     dataset_name = conf.dataset_name
@@ -66,8 +60,7 @@ def start_train(conf:Config):
                               pin_memory  = True,
                               num_workers = num_workers)  # create valid dataloader
 
-
-    # create trainer and tester
+    # create trainer and valider
     trainer = Trainer(model, device, train_loader, optimizer, criterion)
     valider = Tester(model, device, valid_loader)
     valider.add_evaluator(evaluator, name="accuracy")
@@ -75,11 +68,10 @@ def start_train(conf:Config):
 
 
     # start training
-    best_score = get_one(valider.eval()).item() if conf.save_path else 0            # calculate init score if load from checkpoint
     for epoch in range(1,conf.epochs+1):
         print('-'*79)
 
-        train_result = trainer.train()                                              # train a epoch
+        train_result = trainer.fit()                                                # train a epoch
         valid_result = valider.eval()                                               # validate a epoch
 
         lr = scheduler.get_last_lr()[-1]                                            # get current learning rate
@@ -87,10 +79,9 @@ def start_train(conf:Config):
 
         scheduler.step()                                                            # update learning rate
 
-        cur_score = get_one(valid_result).item()                                    # get current score
-        if cur_score > best_score and conf.save_path is not None:                   # save best model
-            save_checkpoint(model, conf.save_path, optim=optimizer, scheduler=scheduler,  overwrite=True)
-            best_score = cur_score
+        if conf.Save:                                                               # save checkpoint if needed
+            cur_score = get_one(valid_result).item()                                # get current score
+            ckpt_manager.update(cur_score, epoch)                                   # save checkpoint if better
 
         if hasattr(conf,"WandB") and conf.WandB:                                    # log result to wandb
             wandb.log({'lr':lr}, step=epoch, commit=False)
@@ -118,6 +109,7 @@ def show_result(conf:Config, epoch, lr, train_result, valid_result:dict) -> None
 if __name__ == '__main__':
     #%% print information
     print(f'Torch version: {torch.__version__}')
+    # initialize
     init(train_conf.seed)
     if hasattr(train_conf,"WandB") and train_conf.WandB:
         wandb.init(project=train_conf.project_name,

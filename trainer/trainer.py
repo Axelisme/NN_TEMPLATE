@@ -9,7 +9,6 @@ from torch import Tensor
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 from torchmetrics import MeanMetric, Metric
-import util.utility as ul
 
 class Trainer:
     def __init__(self,
@@ -33,7 +32,7 @@ class Trainer:
         self.criterion = criterion
         self.statistic = statistic
 
-    def train(self) -> Dict[str, Tensor]:
+    def fit(self) -> Dict[str, Tensor]:
         '''train a model for one epoch:
         output: dict('train_loss', loss), the loss of this epoch'''
         # move model to device

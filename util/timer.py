@@ -1,8 +1,6 @@
 """
 some tools for timing
 """
-
-
 import time
 from functools import wraps
 

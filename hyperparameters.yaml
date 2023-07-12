@@ -10,16 +10,18 @@ base:  # base hyperparameters
     test             : 0.1
   input_size       : [1, 80, 80]          # input [channel, height, width]
   output_size      : [1, 80, 80]          # output [channel, height, width]
-  load_path        : ~                    # if not set this parameter, will use default path: {SAVED_MODEL_DIR}/{model_name}/checkpoint_{model_name}.pt
-  save_path        : ~                    # if not set this parameter, will use default path: {SAVED_MODEL_DIR}/{model_name}/checkpoint_{model_name}.pt
+  load_path        : ~                    # if set to ~ (None), will use default path: {SAVED_MODEL_DIR}/{model_name}/ckpt_{model_name}.pt
+  save_path        : ~                    # same as load_path
 
 train: # train hyperparameters
   batch_size       : 8
   epochs           : 5
-  lr               : 0.0003               # learning rate
+  init_lr          : 0.0003               # initial learning rate
   gamma            : 0.95                 # learning rate decay rate
-  num_workers      : 2                    # number of workers for data loading
+  num_workers      : 2                    # number of workers for data loader
   WandB            : False                # whether to use Weights & Biases
+  Load             : False                # whether to load model
+  Save             : True                 # whether to save model
 
 infer: # inference hyperparameters
-  batch_size       : 1
+  Load             : True                 # whether to load model
