@@ -16,7 +16,7 @@ def main(conf:Config) -> None:
 
     # create model and load
     model = CustomModel(conf)                                                # create model
-    load_checkpoint(model, checkpoint_path=conf.load_path, device=device)    # load model
+    load_checkpoint(model, conf.load_path, device=device)                    # load model
     model.eval()                                                             # set model to eval mode
 
     # prepare test dataset and dataloader

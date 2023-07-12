@@ -6,12 +6,12 @@ import h5py
 import numpy as np
 from typing import Dict, List
 from torch.utils.data import random_split, RandomSampler, BatchSampler
-from util.tool import clear_folder
+from util.io import clear_folder
 from hyperparameters import *
 
 # some parameters
 dataset_name = base_conf.dataset_name
-split_ratio = base_conf.split_ratio.as_dict()
+split_ratio = base_conf.split_ratio
 SAVE_DIR = os.path.join(PROC_DATA_DIR, os.path.splitext(dataset_name)[0])
 clear_folder(SAVE_DIR) # clear the folder before generating data
 

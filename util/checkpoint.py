@@ -5,6 +5,7 @@ import os
 import torch
 from torch.nn import Module
 from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
 from typing import Optional
 
 
@@ -14,51 +15,41 @@ def default_checkpoint(save_dir:str, model_name:str) -> str:
 
 
 def load_checkpoint(model:Module,
+                    ckpt_path:str,
                     optim:Optional[Optimizer] = None,
-                    scheduler = None,
-                    checkpoint_path:Optional[str] = None,
-                    device:Optional[torch.device] = None) -> int:
+                    scheduler:Optional[LRScheduler] = None,
+                    device:Optional[torch.device] = None) -> None:
     """Load checkpoint."""
     # load model
-    if checkpoint_path is None:
-        print('No checkpoint loaded.')
-        return 0
-    if not os.path.exists(checkpoint_path):
-        raise FileNotFoundError(f"File {checkpoint_path} does not exist.")
-    print(f'Loading checkpoint from {checkpoint_path}')
-    if device is None:
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    checkpoint = torch.load(checkpoint_path, map_location=device)
-    epoch = checkpoint['epoch']
+    if not os.path.exists(ckpt_path):
+        raise FileNotFoundError(f"File {ckpt_path} does not exist.")
+
+    print(f'Loading checkpoint from {ckpt_path}')
+    checkpoint = torch.load(ckpt_path, map_location=device)
     model.load_state_dict(checkpoint['model'])
-    model.to(device)
+    if device is not None:
+        model.to(device)
     if optim is not None:
         optim.load_state_dict(checkpoint['optimizer'])
     if scheduler is not None:
         scheduler.load_state_dict(checkpoint['scheduler'])
-    return epoch
 
 
-def save_checkpoint(epoch:int,
-                    model:Module,
+def save_checkpoint(model:Module,
+                    ckpt_path:str,
                     optim:Optional[Optimizer] = None,
-                    scheduler = None,
-                    checkpoint_path:Optional[str] = None,
+                    scheduler:Optional[LRScheduler] = None,
                     overwrite:bool = False) -> None:
     """Save the checkpoint."""
-    if checkpoint_path is None:
-        print('No checkpoint saved.')
-        return
-    if os.path.exists(checkpoint_path) and not overwrite:
-        raise FileExistsError(f"File {checkpoint_path} already exists.")
-    dir = os.path.dirname(checkpoint_path)
-    os.makedirs(dir, exist_ok=True)
-    print(f'Saving model to {checkpoint_path}')
-    model_stat = model.state_dict()
-    optim_stat = optim.state_dict() if optim is not None else None
-    sched_stat = scheduler.state_dict() if scheduler is not None else None
-    torch.save({'epoch': epoch,
-                'model': model_stat,
-                'optimizer': optim_stat,
-                "scheduler": sched_stat},
-                  checkpoint_path)
+    if os.path.exists(ckpt_path) and not overwrite:
+        raise FileExistsError(f"File {ckpt_path} already exists.")
+    os.makedirs(os.path.dirname(ckpt_path), exist_ok=True)
+
+    print(f'Saving model to {ckpt_path}')
+    save_dict = {}
+    save_dict['model'] = model.state_dict()
+    if optim is not None:
+        save_dict['optimizer'] = optim.state_dict()
+    if scheduler is not None:
+        save_dict['scheduler'] = scheduler.state_dict()
+    torch.save(save_dict, ckpt_path)

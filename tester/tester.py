@@ -8,26 +8,22 @@ from torch import nn
 from torch import Tensor
 from torch.utils.data import DataLoader
 from torchmetrics import Metric, MetricCollection, MeanMetric
-from config.configClass import Config
 
 class Tester:
     def __init__(self,
                  model: nn.Module,
-                 config: Config,
+                 device: torch.device,
                  loader: DataLoader,
-                 criterion: Optional[nn.Module] = None,
-                 evaluators: Optional[MetricCollection] = None) -> None:
+                 evaluators: MetricCollection = MetricCollection([])) -> None:
         '''initialize a tester:
         input: model: the model to test,
                config: the config of this model,
                loader: the dataloader of test set,
                evaluators: the evaluator collection to use'''
         self.model = model
-        self.device = torch.device(config.device)
+        self.device = device
         self.test_loader = loader
-        self.criterion = criterion
-        self.loss_statistic = MeanMetric()
-        self.evaluators = MetricCollection([]) if evaluators is None else evaluators
+        self.evaluators = evaluators
 
 
     def add_evaluator(self, evaluator: Metric, name: Optional[str] = None) -> None:
@@ -45,10 +41,6 @@ class Tester:
         # initial model
         self.model.to(self.device)
         self.model.eval()
-        if self.criterion is not None:
-            self.criterion.to(self.device)
-            self.criterion.eval()
-        self.loss_statistic.to(self.device).reset()
         self.evaluators.to(self.device).reset()
 
         # evaluate this model
@@ -59,13 +51,9 @@ class Tester:
                 label = Tensor(label).to(self.device)
                 # forward
                 output = self.model(input)
-                # calculate loss
-                if self.criterion is not None:
-                    loss = self.criterion(output, label)
-                    self.loss_statistic.update(loss)
                 # calculate score
                 self.evaluators.update(output, label)
 
         # return score
-        return {**self.evaluators.compute(), 'valid_loss':self.loss_statistic.compute()}
+        return self.evaluators.compute()
 

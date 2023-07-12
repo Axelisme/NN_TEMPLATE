@@ -10,25 +10,24 @@ from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 from torchmetrics import MeanMetric, Metric
 import util.utility as ul
-from config.configClass import Config
 
 class Trainer:
     def __init__(self,
                  model: nn.Module,
-                 config: Config,
+                 device: torch.device,
                  loader: DataLoader,
                  optimizer: Optimizer,
                  criterion: nn.Module,
                  statistic: Metric = MeanMetric(),):
         '''initialize a trainer:
         input: model: nn.Module, the model to train,
-                config: the config of this model,
+                device: the device to use,
                 train_loader: the dataloader of train set,
                 optimizer: the optimizer of this model,
                 criterion: the criterion of this model,
                 statistic: the statistic method of the loss for each batch'''
         self.model = model
-        self.device = torch.device(config.device)
+        self.device = device
         self.train_loader = loader
         self.optimizer = optimizer
         self.criterion = criterion

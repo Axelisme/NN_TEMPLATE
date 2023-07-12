@@ -18,9 +18,9 @@ LOG_FILE           = path.join(DATA_DIR, 'log.txt')                       # Path
 
 # create config
 all_conf = Config(yaml_path='hyperparameters.yaml')
-base_conf = all_conf.base
-train_conf = all_conf.train
-infer_conf = all_conf.infer
+base_conf  = Config(data=all_conf.base)
+train_conf = Config(data=all_conf.train)
+infer_conf = Config(data=all_conf.infer)
 
 if not hasattr(base_conf, 'load_path'):
     base_conf.load_path = default_checkpoint(SAVED_MODELS_DIR, base_conf.model_name)
