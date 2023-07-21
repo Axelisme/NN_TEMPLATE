@@ -1,7 +1,6 @@
 base:  # base hyperparameters
   project_name     : 'Template'
   model_name       : 'version_test'
-  dataset_name     : "dataset.hdf5"       # prefix : PROC_DATA_DIR/data_type
   seed             : 0
   device           : "cuda:0"
   split_ratio      :
@@ -14,6 +13,8 @@ base:  # base hyperparameters
   save_path        : ~                    # same as load_path
 
 train: # train hyperparameters
+  train_dataset    : 'data/processed/dataset_train.h5'       # train dataset name
+  valid_dataset    : 'data/processed/dataset_valid.h5'       # valid dataset name
   batch_size       : 8
   epochs           : 5
   init_lr          : 0.0003               # initial learning rate
@@ -24,4 +25,7 @@ train: # train hyperparameters
   Save             : True                 # whether to save model
 
 infer: # inference hyperparameters
+  test_dataset     : 'data/processed/dataset_test.h5'       # test dataset name
+  batch_size       : 1
+  num_workers      : 0                    # number of workers for data loader
   Load             : True                 # whether to load model
