@@ -95,9 +95,11 @@ class CheckPointManager:
 
         torch.save(save_dict, ckpt_path)
 
-    def update(self, score: float, epoch: int, overwrite=True, **kwargs) -> bool:
+    def update(self, score: float, epoch: int, overwrite=True, lower_better=False, **kwargs) -> bool:
         """save the checkpoint if the score is better."""
-        if self.best_score is None or score > self.best_score:
+        if  self.best_score is None or \
+                not lower_better and score > self.best_score or \
+                lower_better and score < self.best_score:
             self.save(score=score, epoch=epoch, overwrite=overwrite, **kwargs)
             self.best_score = score
             self.epoch = epoch
