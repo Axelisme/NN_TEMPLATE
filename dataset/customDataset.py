@@ -1,11 +1,9 @@
 
 """define a class for the dataset"""
 
-import os
 import h5py
 from typing import Callable, Optional
 import torch.utils.data as data
-from hyperparameters import PROC_DATA_DIR
 from config.configClass import Config
 
 def load_processed_dataset(file_path: str):
@@ -15,11 +13,11 @@ def load_processed_dataset(file_path: str):
 
 class CustomDataSet(data.Dataset):
     """define a class for the dataset"""
-    def __init__(self, conf: Config, dataset_path, transform:Optional[Callable] = None):
+    def __init__(self, conf: Config, dataset_path:str, transform:Optional[Callable] = None):
         """initialize the dataset
             conf: the config object.
             dataset_path: the file path of the dataset file.
-            transform: the transform function of the input.
+            transform: the transform function before input the data to the model.
         """
         super(CustomDataSet, self).__init__()
         self.conf = conf

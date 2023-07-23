@@ -45,8 +45,8 @@ def start_train(conf:Config):
     # prepare dataset and dataloader
     train_transform = None
     valid_transform = None
-    train_set = CustomDataSet(conf, "train", conf.train_dataset, transform=train_transform)    # create train dataset
-    valid_set = CustomDataSet(conf, "valid", conf.valid_dataset, transform=valid_transform)    # create valid dataset
+    train_set = CustomDataSet(conf, conf.train_dataset, transform=train_transform)    # create train dataset
+    valid_set = CustomDataSet(conf, conf.valid_dataset, transform=valid_transform)    # create valid dataset
     batch_size = conf.batch_size
     num_workers = conf.num_workers
     train_loader = DataLoader(dataset     = train_set,
