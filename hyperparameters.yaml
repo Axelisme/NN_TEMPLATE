@@ -37,3 +37,26 @@ infer: # inference hyperparameters
   batch_size       : 1
   num_workers      : 0                    # number of workers for data loader
   Load             : True                 # whether to load model
+
+sweep: # for tuning hyperparameters
+  name : 'sweep_name'
+  num_trials : 10                   # number of trials
+  max_parallel     : 2              # maximum number of parallel trials
+  config :
+    method : 'random'               # 'grid' or 'random'
+    metric :
+      name   : 'accuracy'           # metric to optimize
+      goal   : 'maximize'           # 'minimize' or 'maximize'
+    parameters :
+      epochs :
+        value  : 10
+      seed   :
+        value  : [0, 1]
+      batch_size :
+        min    : 8
+        max    : 16
+        distribution : 'int_uniform'
+      init_lr :
+        min    : 0.0001
+        max    : 0.001
+        distribution : 'log_uniform'

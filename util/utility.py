@@ -19,10 +19,10 @@ def set_seed(seed: int, cudnn_benchmark = False) -> None:
     cudnn.benchmark = cudnn_benchmark
 
 
-def init(seed : int) -> None:
+def init(seed : int, start_method:str = 'forkserver') -> None:
     """Initialize the script."""
     # set float32 matmul precision
-    torch.multiprocessing.set_start_method('forkserver', force=True)
+    torch.multiprocessing.set_start_method(start_method, force=True)
     torch.set_float32_matmul_precision('medium')
     # set random seed
     set_seed(seed=seed, cudnn_benchmark=True)
