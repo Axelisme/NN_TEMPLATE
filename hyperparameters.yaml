@@ -22,7 +22,7 @@ base:  # base hyperparameters
 train: # train hyperparameters
   train_dataset    : 'data/processed/dataset_train.h5'       # train dataset name
   valid_dataset    : 'data/processed/dataset_valid.h5'       # valid dataset name
-  gradient_accumalation_steps : 1
+  gradient_accumulation_steps : 1
   batch_size       : 8
   epochs           : 5
   init_lr          : 0.0003               # initial learning rate
@@ -31,6 +31,8 @@ train: # train hyperparameters
   WandB            : False                # whether to use Weights & Biases
   Load             : False                # whether to load model
   Save             : True                 # whether to save model
+  save_metric      : 'accuracy'           # metric to save model
+  lower_better     : False                # whether lower metric is better
 
 infer: # inference hyperparameters
   test_dataset     : 'data/processed/dataset_test.h5'       # test dataset name
@@ -39,9 +41,8 @@ infer: # inference hyperparameters
   Load             : True                 # whether to load model
 
 sweep: # for tuning hyperparameters
-  name : 'sweep_name'
+  name : 'sweep_lr'
   num_trials : 10                   # number of trials
-  max_parallel     : 2              # maximum number of parallel trials
   config :
     method : 'random'               # 'grid' or 'random'
     metric :
@@ -51,12 +52,11 @@ sweep: # for tuning hyperparameters
       epochs :
         value  : 10
       seed   :
-        value  : [0, 1]
+        value  : 0
+      gradient_accumulation_steps : 1
       batch_size :
-        min    : 8
-        max    : 16
-        distribution : 'int_uniform'
+        value  : 64
       init_lr :
         min    : 0.0001
         max    : 0.001
-        distribution : 'log_uniform'
+        distribution : 'uniform'

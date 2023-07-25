@@ -34,7 +34,7 @@ def start_train(conf:Config):
     criterion = CrossEntropyLoss()                                                          # create criterion
     eval1 = MulticlassAccuracy(num_classes=conf.output_size, average='macro')               # create evaluator
     eval2 = LossScore(criterion)
-    evaluators = MetricCollection([eval1, eval2])
+    evaluators = MetricCollection({'accuracy':eval1, 'val_loss':eval2})
 
     # load model and optimizer from checkpoint if needed
     ckpt_manager = CheckPointManager(conf, model, optim=optimizer, scheduler=scheduler)
@@ -54,7 +54,7 @@ def start_train(conf:Config):
     num_workers = conf.num_workers
     train_loader = DataLoader(dataset     = train_set,
                               batch_size  = batch_size,
-                              shuffle     = False,
+                              shuffle     = True,
                               pin_memory  = True,
                               num_workers = num_workers)  # create train dataloader
     valid_loader = DataLoader(dataset     = valid_set,
@@ -68,8 +68,8 @@ def start_train(conf:Config):
     valider = Valider(conf, model, device, valid_loader, evaluators)
 
     # start training
-    save_metric = "accuracy"
-    lower_better = False
+    save_metric = conf.save_metric
+    lower_better = conf.lower_better
     for epoch in range(1,conf.epochs+1):
         print('-'*79)
 

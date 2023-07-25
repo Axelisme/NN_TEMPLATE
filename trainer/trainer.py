@@ -24,14 +24,14 @@ class Trainer:
         input: config: Config, the config of this model,
                 model: nn.Module, the model to train,
                 device: the device to use,
-                train_loader: the dataloader of train set,
+                loader: the dataloader of train set,
                 optimizer: the optimizer of this model,
                 criterion: the criterion of this model,
                 statistic: the statistic method of the loss for each batch'''
         self.config = config
         self.model = model
         self.device = device
-        self.train_loader = loader
+        self.dataloader = loader
         self.optimizer = optimizer
         self.criterion = criterion
         self.statistic = statistic
@@ -58,8 +58,8 @@ class Trainer:
         gradient_accumulation_steps = self.config.gradient_accumulation_steps
 
         # train for one epoch
-        batch_num = len(self.train_loader)
-        pbar = tqdm(total=batch_num, desc='Train', dynamic_ncols=True)
+        batch_num = len(self.dataloader)
+        pbar = tqdm(self.dataloader, total=batch_num, desc='Train', dynamic_ncols=True)
         for batch_idx, (input, label) in enumerate(pbar, start=1):
             # move input and label to device
             input = input.to(self.device)

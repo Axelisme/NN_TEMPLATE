@@ -26,7 +26,7 @@ class Valider:
         self.config = config
         self.model = model
         self.device = device
-        self.test_loader = loader
+        self.dataloader = loader
         self.evaluators = evaluators
 
 
@@ -54,8 +54,8 @@ class Valider:
 
         # evaluate this model
         with torch.no_grad():
-            batch_num = len(self.test_loader)
-            pbar = tqdm(total=batch_num, desc='Test ', dynamic_ncols=True)
+            batch_num = len(self.dataloader)
+            pbar = tqdm(self.dataloader, total=batch_num, desc='Test ', dynamic_ncols=True)
             for batch_idx, (input, label) in enumerate(pbar, start=1):
                 # move input and label to device
                 input = input.to(self.device)
