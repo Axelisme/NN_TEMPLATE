@@ -1,5 +1,5 @@
 
-"""define a class to test the model"""
+"""define a class to valid the model"""
 
 from typing import Dict, Optional
 from tqdm.auto import tqdm
@@ -8,18 +8,22 @@ from torch import nn
 from torch import Tensor
 from torch.utils.data import DataLoader
 from torchmetrics import Metric, MetricCollection
+from config.configClass import Config
 
-class Tester:
+class Valider:
     def __init__(self,
+                 config: Config,
                  model: nn.Module,
                  device: torch.device,
                  loader: DataLoader,
                  evaluators: MetricCollection = MetricCollection([])) -> None:
-        '''initialize a tester:
-        input: model: the model to test,
+        '''initialize a valider:
+        input: config: Config, the config of this model,
+               model: the model to test,
                config: the config of this model,
                loader: the dataloader of test set,
                evaluators: the evaluator collection to use'''
+        self.config = config
         self.model = model
         self.device = device
         self.test_loader = loader
@@ -38,20 +42,27 @@ class Tester:
     def eval(self) -> Dict[str, Tensor]:
         '''test a model on test set:
         output: Dict, the result of this model'''
-        # initial model
+        # move module to device
         self.model.to(self.device)
+        self.evaluators.to(self.device)
+
+        # initial model
         self.model.eval()
-        self.evaluators.to(self.device).reset()
+
+        # initial evaluators
+        self.evaluators.reset()
 
         # evaluate this model
         with torch.no_grad():
-            for batch_idx,(input,label) in enumerate(tqdm(self.test_loader, desc='Test ', dynamic_ncols=True)):
+            batch_num = len(self.test_loader)
+            pbar = tqdm(total=batch_num, desc='Test ', dynamic_ncols=True)
+            for batch_idx, (input, label) in enumerate(pbar, start=1):
                 # move input and label to device
-                input = Tensor(input).to(self.device)
-                label = Tensor(label).to(self.device)
+                input = input.to(self.device)
+                label = label.to(self.device)
                 # forward
                 output = self.model(input)
-                # calculate score
+                # compute and record score
                 self.evaluators.update(output, label)
 
         # return score

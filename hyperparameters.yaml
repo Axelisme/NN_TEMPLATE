@@ -14,6 +14,7 @@ base:  # base hyperparameters
   save_path        : ~                    # same as load_path
 
 train: # train hyperparameters
+  gradient_accumalation_steps : 1
   batch_size       : 8
   epochs           : 5
   init_lr          : 0.0003               # initial learning rate

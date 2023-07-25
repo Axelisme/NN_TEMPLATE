@@ -5,16 +5,17 @@
 from typing import Dict
 import wandb
 import torch
-from torch import nn
 from torch.optim import AdamW
 from torch.optim import lr_scheduler
+from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader
-import torchmetrics.classification as cf
+from torchmetrics.classification import MulticlassAccuracy
+from torchmetrics import MetricCollection
 from util.utility import init
 from hyperparameters import train_conf
 from model.customModel import CustomModel
 from evaluator.Loss2evaluator import LossScore
-from tester.tester import Tester
+from valider.valider import Valider
 from dataset.customDataset import CustomDataSet
 from trainer.trainer import Trainer
 from config.configClass import Config
@@ -31,8 +32,10 @@ def start_train(conf:Config):
     model = CustomModel(conf)                                                               # create model
     optimizer = AdamW(model.parameters(), lr=conf.init_lr)                                  # create optimizer
     scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=conf.gamma)                     # create scheduler
-    criterion = nn.CrossEntropyLoss()                                                       # create criterion
-    evaluator = cf.MulticlassAccuracy(num_classes=conf.output_size, average='macro')        # create evaluator
+    criterion = CrossEntropyLoss()                                                          # create criterion
+    eval1 = MulticlassAccuracy(num_classes=conf.output_size, average='macro')               # create evaluator
+    eval2 = LossScore(criterion)
+    evaluators = MetricCollection([eval1, eval2])
 
     # load model and optimizer from checkpoint if needed
     ckpt_manager = CheckPointManager(conf, model, optim=optimizer, scheduler=scheduler)
@@ -61,10 +64,8 @@ def start_train(conf:Config):
                               num_workers = num_workers)  # create valid dataloader
 
     # create trainer and valider
-    trainer = Trainer(model, device, train_loader, optimizer, criterion)
-    valider = Tester(model, device, valid_loader)
-    valider.add_evaluator(evaluator, name="accuracy")
-    valider.add_evaluator(LossScore(criterion), name="val_loss")
+    trainer = Trainer(conf, model, device, train_loader, optimizer, criterion)
+    valider = Valider(conf, model, device, valid_loader, evaluators)
 
 
     # start training

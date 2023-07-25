@@ -16,7 +16,6 @@ def main(conf:Config) -> None:
 
     # setup model and other components
     model = CustomModel(conf)                                                # create model
-    model.eval()
 
     # load model from checkpoint if needed
     ckpt_manager = CheckPointManager(conf, model)
