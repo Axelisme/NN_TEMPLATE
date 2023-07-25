@@ -2,7 +2,6 @@
 """A script to train a model on the train dataset."""
 
 #%%
-from typing import Dict
 import wandb
 import torch
 from torch.optim import AdamW
@@ -47,9 +46,10 @@ def start_train(conf:Config):
         wandb.watch(models=model, criterion=criterion, log="gradients", log_freq=100)
 
     # prepare dataset and dataloader
-    dataset_name = conf.dataset_name
-    train_set = CustomDataSet(conf, "train", dataset_name)    # create train dataset
-    valid_set = CustomDataSet(conf, "valid", dataset_name)    # create valid dataset
+    train_transform = None
+    valid_transform = None
+    train_set = CustomDataSet(conf, conf.train_dataset, transform=train_transform)    # create train dataset
+    valid_set = CustomDataSet(conf, conf.valid_dataset, transform=valid_transform)    # create valid dataset
     batch_size = conf.batch_size
     num_workers = conf.num_workers
     train_loader = DataLoader(dataset     = train_set,
@@ -67,8 +67,9 @@ def start_train(conf:Config):
     trainer = Trainer(conf, model, device, train_loader, optimizer, criterion)
     valider = Valider(conf, model, device, valid_loader, evaluators)
 
-
     # start training
+    save_metric = "accuracy"
+    lower_better = False
     for epoch in range(1,conf.epochs+1):
         print('-'*79)
 
@@ -81,18 +82,13 @@ def start_train(conf:Config):
         scheduler.step()                                                            # update learning rate
 
         if conf.Save:                                                               # save checkpoint if needed
-            cur_score = get_one(valid_result).item()                                # get current score
-            ckpt_manager.update(cur_score, epoch)                                   # save checkpoint if better
+            cur_score = valid_result[save_metric].item()                            # get current score
+            ckpt_manager.update(cur_score, epoch, lower_better=lower_better)        # save checkpoint if better
 
         if hasattr(conf,"WandB") and conf.WandB:                                    # log result to wandb
             wandb.log({'lr':lr}, step=epoch, commit=False)
             wandb.log({'train_loss':train_result}, step=epoch, commit=False)
             wandb.log(valid_result, step=epoch, commit=True)
-
-
-def get_one(dict:Dict):
-    """Get the first element of a dict."""
-    return next(iter(dict.values()))
 
 
 def show_result(conf:Config, epoch, lr, train_result, valid_result:dict) -> None:

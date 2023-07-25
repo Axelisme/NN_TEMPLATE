@@ -10,9 +10,10 @@ from util.io import clear_folder
 from hyperparameters import base_conf, PROC_DATA_DIR
 
 # some parameters
-dataset_name = base_conf.dataset_name
+RAW_DATA_DIR = ""
+dataset_name = ""
 split_ratio = base_conf.split_ratio
-SAVE_DIR = os.path.join(PROC_DATA_DIR, os.path.splitext(dataset_name)[0])
+SAVE_DIR = os.path.join(PROC_DATA_DIR, dataset_name)
 clear_folder(SAVE_DIR) # clear the folder before generating data
 
 
@@ -22,8 +23,7 @@ def generate_process_data(save_dir:str, dataset_name:str) -> None:
     Generate whole processed data for the project.
     """
     # create folder for processed data
-    ALL_DATASET_PATH = os.path.join(save_dir, "all", dataset_name)
-    os.makedirs(os.path.dirname(ALL_DATASET_PATH), exist_ok=True)
+    ALL_DATASET_PATH = os.path.join(save_dir, f"{dataset_name}_all.h5")
 
     # load data
     data_dtype = np.dtype([("input", np.uint32, (2,)), ("label", np.uint8)])  # TODO: the data format in the dataset
@@ -34,7 +34,7 @@ def generate_process_data(save_dir:str, dataset_name:str) -> None:
     print(f"Writting total dataset to {ALL_DATASET_PATH}")
     with h5py.File(ALL_DATASET_PATH, mode='w') as writer:
         # write meta data
-        writer.attrs["name"] = "all"
+        writer.attrs["mode"] = "all"
         writer.attrs["length"] = data_length
         writer.attrs["ratio"] = 1.0
         writer.attrs["data_dtype"] = str(data_dtype)
@@ -51,7 +51,7 @@ def split_process_data(save_dir:str, dataset_name:str, split_ratio:Dict[str,floa
     """
     Split the whole processed data into some dataset.
     """
-    ALL_DATASET_PATH = os.path.join(save_dir, "all", dataset_name)
+    ALL_DATASET_PATH = os.path.join(save_dir, f"{dataset_name}_all.h5")
 
     with h5py.File(ALL_DATASET_PATH, mode='r') as reader:
         # load data
@@ -60,15 +60,14 @@ def split_process_data(save_dir:str, dataset_name:str, split_ratio:Dict[str,floa
         splited_datasets = random_split(dataset, list(split_ratio.values())) # type: ignore
 
         # save splited dataset
-        for (name, ratio), named_dataset in zip(split_ratio.items(), splited_datasets):
-            NAMED_DATASET_PATH = os.path.join(save_dir, name, dataset_name)
-            os.makedirs(os.path.dirname(NAMED_DATASET_PATH), exist_ok=True)
-            print(f"Writting {name} dataset to {NAMED_DATASET_PATH}")
+        for (mode, ratio), named_dataset in zip(split_ratio.items(), splited_datasets):
+            NAMED_DATASET_PATH = os.path.join(save_dir, f"{dataset_name}_{mode}.h5")
+            print(f"Writting {mode} dataset to {NAMED_DATASET_PATH}")
 
             # save data to h5 file
             with h5py.File(NAMED_DATASET_PATH, mode='w') as writer:
                 # write meta data
-                writer.attrs["name"] = name
+                writer.attrs["mode"] = mode
                 writer.attrs["length"] = len(named_dataset)
                 writer.attrs["ratio"] = ratio
                 writer.attrs["data_dtype"] = reader.attrs["data_dtype"]
@@ -80,14 +79,14 @@ split_process_data(SAVE_DIR, dataset_name, split_ratio)
 
 
 #%%
-def sampling_process_samples(save_dir, dataset_name:str, data_name:List[str], num = 100):
+def sampling_process_samples(save_dir, dataset_name:str, modes:List[str], num = 100):
     """
     Sampling some samples from the processed data.
     """
-    for name in data_name:
-        DATASER_PATH = os.path.join(save_dir, name, dataset_name)
-        SAMPLES_DIR = os.path.join(save_dir, name, "samples")
-        os.makedirs(SAMPLES_DIR, exist_ok=True)
+    for mode in modes:
+        DATASER_PATH = os.path.join(save_dir, f"{dataset_name}_{mode}.h5")
+        SAMPLES_DIR = os.path.join(save_dir, f"{mode}_samples")
+        clear_folder(SAMPLES_DIR)
         with h5py.File(DATASER_PATH, mode='r') as reader:
             # load data
             dataset = reader["dataset"]
