@@ -5,7 +5,7 @@
 import wandb
 import torch
 from torch.optim import AdamW
-from torch.optim import lr_scheduler
+from torch.optim.lr_scheduler import ExponentialLR
 from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader
 from torchmetrics.classification import MulticlassAccuracy
@@ -30,7 +30,7 @@ def start_train(conf:Config):
     # setup model and other components
     model = CustomModel(conf)                                                               # create model
     optimizer = AdamW(model.parameters(), lr=conf.init_lr)                                  # create optimizer
-    scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=conf.gamma)                     # create scheduler
+    scheduler = ExponentialLR(optimizer, gamma=conf.gamma)                                  # create scheduler
     criterion = CrossEntropyLoss()                                                          # create criterion
     eval1 = MulticlassAccuracy(num_classes=conf.output_size, average='macro')               # create evaluator
     eval2 = LossScore(criterion)
@@ -76,7 +76,7 @@ def start_train(conf:Config):
         train_result = trainer.fit()                                                # train a epoch
         valid_result = valider.eval()                                               # validate a epoch
 
-        lr = scheduler.get_last_lr()[-1]                                            # get current learning rate
+        lr = scheduler.get_lr()                                                     # get current learning rate
         show_result(conf, epoch, lr, train_result, valid_result)                    # show result
 
         scheduler.step()                                                            # update learning rate
