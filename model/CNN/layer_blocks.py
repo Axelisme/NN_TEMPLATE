@@ -44,14 +44,14 @@ class ResidualBlock(nn.Module):
         ) if (stride != 1) or (in_channel != out_channel) else None
 
     def forward(self, x):
-        residual = x
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.relu(out)
-        out = self.conv2(out)
-        out = self.bn2(out)
+        original = x
+        residual = self.conv1(x)
+        residual = self.bn1(residual)
+        residual = self.relu(residual)
+        residual = self.conv2(residual)
+        residual = self.bn2(residual)
         if self.downsample:
-            residual = self.downsample(residual)
-        out += residual
+            original = self.downsample(original)
+        out = original + residual
         out = self.relu(out)
         return out

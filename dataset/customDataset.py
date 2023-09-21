@@ -36,7 +36,7 @@ class CustomDataSet(data.Dataset):
 
     def __del__(self):
         # close file handler if exists
-        if self.fileHandler is not None:
+        if hasattr(self,'fileHandler') and self.fileHandler is not None:
             self.fileHandler.close()
 
 

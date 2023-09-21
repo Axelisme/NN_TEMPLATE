@@ -4,13 +4,13 @@
 import os
 import h5py
 import numpy as np
-from typing import Dict, List
-from torch.utils.data import random_split, RandomSampler, BatchSampler
+import random
+from typing import Callable
 from util.io import clear_folder
-from hyperparameters import base_conf, PROC_DATA_DIR
+from hyperparameters import base_conf, RAW_DATA_DIR, PROC_DATA_DIR
+import multiprocessing as mp
 
 # some parameters
-RAW_DATA_DIR = ""
 dataset_name = ""
 split_ratio = base_conf.split_ratio
 SAVE_DIR = os.path.join(PROC_DATA_DIR, dataset_name)
@@ -18,85 +18,68 @@ clear_folder(SAVE_DIR) # clear the folder before generating data
 
 
 #%%
-def generate_process_data(save_dir:str, dataset_name:str) -> None:
+def generate_process_data(dataset_path:str,
+                          data_dtype:np.dtype,
+                          data_loader:Callable,
+                          mode_length:int = 1000,
+                          max_batch_num:int = 100) -> None:
     """
-    Generate whole processed data for the project.
+    Generate processed data for the project.
     """
-    # create folder for processed data
-    ALL_DATASET_PATH = os.path.join(save_dir, f"{dataset_name}_all.h5")
-
-    # load data
-    data_dtype = np.dtype([("input", np.uint32, (2,)), ("label", np.uint8)])  # TODO: the data format in the dataset
-    datas = [([i,10*i],100*i) for i in range(10)] #TODO load data
-    data_length = len(datas)
-
     # save data to h5 file
-    print(f"Writting total dataset to {ALL_DATASET_PATH}")
-    with h5py.File(ALL_DATASET_PATH, mode='w') as writer:
-        # write meta data
-        writer.attrs["mode"] = "all"
-        writer.attrs["length"] = data_length
-        writer.attrs["ratio"] = 1.0
-        writer.attrs["data_dtype"] = str(data_dtype)
-        # write dataset
-        dataset = writer.create_dataset("dataset", (data_length,), dtype=data_dtype)
-        for idx, data_i in enumerate(datas):
-            dataset[idx] = data_i
+    with mp.Pool(mp.cpu_count()) as pool:
+        with h5py.File(dataset_path, mode='x') as writer:
+            # write meta data
+            writer.attrs["length"] = mode_length
+            writer.attrs["data_dtype"] = str(data_dtype)
+            # create dataset
+            dataset = writer.create_dataset("dataset", (mode_length,), dtype=data_dtype)
+            # write dataset
+            saved_num = 0
+            while saved_num < mode_length:
+                batch_num = min(max_batch_num, mode_length - saved_num)
+                save_ids = list(range(saved_num, saved_num + batch_num))
+                batch = pool.imap_unordered(data_loader, save_ids)
+                for idx, data in zip(save_ids, batch):
+                    dataset[idx] = data
+                saved_num += batch_num
 
-generate_process_data(SAVE_DIR, dataset_name)
+def data_loader(idx:int) -> np.ndarray:
+    return None
 
+data_dtype = np.dtype([("input", np.uint32, (2,)), ("label", np.uint8)])  # TODO: the data format in the dataset
+data_length = 1000
+for mode, ratio in split_ratio.items():
+    DATASET_PATH = os.path.join(SAVE_DIR, f"{mode}.h5")
+    mode_length = int(data_length * ratio)
 
-#%%
-def split_process_data(save_dir:str, dataset_name:str, split_ratio:Dict[str,float]) -> None:
-    """
-    Split the whole processed data into some dataset.
-    """
-    ALL_DATASET_PATH = os.path.join(save_dir, f"{dataset_name}_all.h5")
-
-    with h5py.File(ALL_DATASET_PATH, mode='r') as reader:
-        # load data
-        dataset = reader["dataset"]
-        # split dataset
-        splited_datasets = random_split(dataset, list(split_ratio.values())) # type: ignore
-
-        # save splited dataset
-        for (mode, ratio), named_dataset in zip(split_ratio.items(), splited_datasets):
-            NAMED_DATASET_PATH = os.path.join(save_dir, f"{dataset_name}_{mode}.h5")
-            print(f"Writting {mode} dataset to {NAMED_DATASET_PATH}")
-
-            # save data to h5 file
-            with h5py.File(NAMED_DATASET_PATH, mode='w') as writer:
-                # write meta data
-                writer.attrs["mode"] = mode
-                writer.attrs["length"] = len(named_dataset)
-                writer.attrs["ratio"] = ratio
-                writer.attrs["data_dtype"] = reader.attrs["data_dtype"]
-                print(reader.attrs["data_dtype"])
-                # write dataset
-                dataset = writer.create_dataset("dataset", data=named_dataset)
-
-split_process_data(SAVE_DIR, dataset_name, split_ratio)
+    print(f"Writting {mode} dataset with length {mode_length} to {DATASET_PATH}")
+    generate_process_data(DATASET_PATH, data_dtype, data_loader, mode_length)
 
 
 #%%
-def sampling_process_samples(save_dir, dataset_name:str, modes:List[str], num = 100):
+def sampling_process_samples(dataset_path:str,
+                             sample_saver:Callable,
+                             max_num:int = 20,
+                             *args, **kwargs) -> None:
     """
     Sampling some samples from the processed data.
     """
-    for mode in modes:
-        DATASER_PATH = os.path.join(save_dir, f"{dataset_name}_{mode}.h5")
-        SAMPLES_DIR = os.path.join(save_dir, f"{mode}_samples")
-        clear_folder(SAMPLES_DIR)
-        with h5py.File(DATASER_PATH, mode='r') as reader:
-            # load data
-            dataset = reader["dataset"]
-            # sampling
-            sampler = RandomSampler(dataset, replacement=False) # type: ignore
-            batch_sampler = BatchSampler(sampler, batch_size=num, drop_last=False)
-            batch = next(iter(batch_sampler))
-            # save samples
-            for idx, sample in enumerate(batch):
-                print(f"Saving sample {idx}")
-                #TODO save sample
+    with h5py.File(dataset_path, mode='r') as reader:
+        # load data
+        dataset = reader["dataset"]
+        data_length = reader.attrs["length"]
+        # sampling
+        sample_ids = random.sample(range(data_length), max_num)
+        # save samples
+        for idx, sample_id in enumerate(sample_ids):
+            print(f"Saving sample {idx}")
+            sample = dataset[sample_id]
+            sample_saver(sample, *args, **kwargs)
 
-sampling_process_samples(SAVE_DIR, dataset_name, list(split_ratio.keys()), num=100)
+def sample_saver(sample):
+    pass
+
+for mode in split_ratio.keys():
+    dataset_path = os.path.join(SAVE_DIR, f"{mode}.h5")
+    sampling_process_samples(dataset_path, sample_saver)

@@ -16,12 +16,10 @@ base:  # base hyperparameters
     test             : 0.1
   input_size       : [1, 80, 80]          # input [channel, height, width]
   output_size      : [1, 80, 80]          # output [channel, height, width]
-  load_path        : ~                    # if set to ~ (None), will use default path: {SAVED_MODEL_DIR}/{model_name}/ckpt_{model_name}.pt
-  save_path        : ~                    # same as load_path
 
 train: # train hyperparameters
-  train_dataset    : 'data/processed/dataset_train.h5'       # train dataset name
-  valid_dataset    : 'data/processed/dataset_valid.h5'       # valid dataset name
+  train_dataset    : 'data/processed/dataset1/train.h5'       # train dataset name
+  valid_dataset    : 'data/processed/dataset1/valid.h5'       # valid dataset name
   gradient_accumulation_steps : 1
   batch_size       : 8
   epochs           : 5
@@ -31,14 +29,18 @@ train: # train hyperparameters
   WandB            : False                # whether to use Weights & Biases
   Load             : False                # whether to load model
   Save             : True                 # whether to save model
+  load_path        : ~                    # if set to ~ (None), will use default path: {SAVED_MODEL_DIR}/{model_name}/ckpt_{model_name}.pt
+  save_path        : ~                    # same as load_path
   save_metric      : 'accuracy'           # metric to save model
   lower_better     : False                # whether lower metric is better
+  keep_num         : 1                    # number of models to keep
 
 infer: # inference hyperparameters
-  test_dataset     : 'data/processed/dataset_test.h5'       # test dataset name
+  test_dataset     : 'data/processed/dataset1/test.h5'       # test dataset name
   batch_size       : 1
   num_workers      : 0                    # number of workers for data loader
   Load             : True                 # whether to load model
+  load_path        : ~
 
 sweep: # for tuning hyperparameters
   name : 'sweep_lr'
@@ -53,7 +55,8 @@ sweep: # for tuning hyperparameters
         value  : 10
       seed   :
         value  : 0
-      gradient_accumulation_steps : 1
+      gradient_accumulation_steps :
+        value  : 1
       batch_size :
         value  : 64
       init_lr :

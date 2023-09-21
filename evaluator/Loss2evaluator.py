@@ -26,7 +26,7 @@ class LossScore(Metric):
         self.criterion.eval()
         with torch.no_grad():
             self.total_loss += self.criterion(output, label).item()
-            self.total_num  += label.size(0)  # type: ignore
+            self.total_num  += 1
         self.criterion.train(original_mode)
 
     def compute(self) -> Tensor:

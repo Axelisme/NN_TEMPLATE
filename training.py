@@ -37,7 +37,7 @@ def start_train(conf:Config):
     evaluators = MetricCollection({'accuracy':eval1, 'val_loss':eval2})
 
     # load model and optimizer from checkpoint if needed
-    ckpt_manager = CheckPointManager(conf, model, optim=optimizer, scheduler=scheduler)
+    ckpt_manager = CheckPointManager(conf, model, optim=optimizer, scheduler=scheduler, lower_better=conf.lower_better)
     if conf.Load:
         ckpt_manager.load(ckpt_path=conf.load_path, device=device)
 
@@ -69,21 +69,20 @@ def start_train(conf:Config):
 
     # start training
     save_metric = conf.save_metric
-    lower_better = conf.lower_better
     for epoch in range(1,conf.epochs+1):
         print('-'*79)
 
         train_result = trainer.fit()                                                # train a epoch
         valid_result = valider.eval()                                               # validate a epoch
 
-        lr = scheduler.get_lr()                                                     # get current learning rate
+        lr = optimizer.param_groups[0]['lr']                                        # get current learning rate
         show_result(conf, epoch, lr, train_result, valid_result)                    # show result
 
-        scheduler.step()                                                            # update learning rate
+        cur_score = valid_result[save_metric].item()                                # get current score
+        scheduler.step(metrics=cur_score)                                           # update learning rate
 
         if conf.Save:                                                               # save checkpoint if needed
-            cur_score = valid_result[save_metric].item()                            # get current score
-            ckpt_manager.update(cur_score, epoch, lower_better=lower_better)        # save checkpoint if better
+            ckpt_manager.update(cur_score, epoch)                                   # save checkpoint if better
 
         if hasattr(conf,"WandB") and conf.WandB:                                    # log result to wandb
             wandb.log({'lr':lr}, step=epoch, commit=False)
