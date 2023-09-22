@@ -1,7 +1,4 @@
-
-"""A script to train a model on the train dataset."""
-
-#%%
+import time
 import wandb
 import torch
 from torch.optim import AdamW
@@ -32,12 +29,13 @@ def start_train(conf:Config):
     optimizer = AdamW(model.parameters(), lr=conf.init_lr)                                  # create optimizer
     scheduler = ExponentialLR(optimizer, gamma=conf.gamma)                                  # create scheduler
     criterion = CrossEntropyLoss()                                                          # create criterion
-    eval1 = MulticlassAccuracy(num_classes=conf.output_size, average='macro')               # create evaluator
+    eval1 = MulticlassAccuracy(num_classes=conf.output_size[0], average='macro')            # create evaluator
     eval2 = LossScore(criterion)
     evaluators = MetricCollection({'accuracy':eval1, 'val_loss':eval2})
 
     # load model and optimizer from checkpoint if needed
     ckpt_manager = CheckPointManager(conf, model, optim=optimizer, scheduler=scheduler, lower_better=conf.lower_better)
+    ckpt_manager.save_config(f"train_{time.strftime('%Y%m%d_%H%M%S')}.yaml")
     if conf.Load:
         ckpt_manager.load(ckpt_path=conf.load_path, device=device)
 
@@ -78,10 +76,10 @@ def start_train(conf:Config):
         lr = optimizer.param_groups[0]['lr']                                        # get current learning rate
         show_result(conf, epoch, lr, train_result, valid_result)                    # show result
 
-        cur_score = valid_result[save_metric].item()                                # get current score
-        scheduler.step(metrics=cur_score)                                           # update learning rate
+        scheduler.step()                                                            # update learning rate
 
         if conf.Save:                                                               # save checkpoint if needed
+            cur_score = valid_result[save_metric].item()                                # get current score
             ckpt_manager.update(cur_score, epoch)                                   # save checkpoint if better
 
         if hasattr(conf,"WandB") and conf.WandB:                                    # log result to wandb
@@ -90,7 +88,7 @@ def start_train(conf:Config):
             wandb.log(valid_result, step=epoch, commit=True)
 
 
-def show_result(conf:Config, epoch, lr, train_result, valid_result:dict) -> None:
+def show_result(conf:Config, epoch, lr, train_result, valid_result:dict):
     """Print result of training and validation."""
     # print result
     print(f'Epoch: ({epoch} / {conf.epochs})')
@@ -103,7 +101,7 @@ def show_result(conf:Config, epoch, lr, train_result, valid_result:dict) -> None
 
 
 if __name__ == '__main__':
-    #%% print information
+    # print information
     print(f'Torch version: {torch.__version__}')
     # initialize
     init(train_conf.seed)
@@ -112,5 +110,5 @@ if __name__ == '__main__':
                    name=train_conf.model_name,
                    config=train_conf.as_dict())
 
-    #%% start training
+    # start training
     start_train(train_conf)

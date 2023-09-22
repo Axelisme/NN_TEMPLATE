@@ -7,25 +7,25 @@ LOG_FILE         : 'data/log.txt'         # Path to the log file
 
 base:  # base hyperparameters
   project_name     : 'Template'
-  model_name       : 'version_test'
+  model_name       : 'template'
   seed             : 0
   device           : "cuda:0"
   split_ratio      :
     train            : 0.8
     valid            : 0.1
     test             : 0.1
-  input_size       : [1, 80, 80]          # input [channel, height, width]
-  output_size      : [1, 80, 80]          # output [channel, height, width]
+  input_size       : [1, 80, 80]          # input shape
+  output_size      : [10]                 # output shape
 
 train: # train hyperparameters
-  train_dataset    : 'data/processed/dataset1/train.h5'       # train dataset name
-  valid_dataset    : 'data/processed/dataset1/valid.h5'       # valid dataset name
+  train_dataset    : 'data/processed/template/train.h5'       # train dataset name
+  valid_dataset    : 'data/processed/template/valid.h5'       # valid dataset name
   gradient_accumulation_steps : 1
   batch_size       : 8
-  epochs           : 5
+  epochs           : 20
   init_lr          : 0.0003               # initial learning rate
   gamma            : 0.95                 # learning rate decay rate
-  num_workers      : 2                    # number of workers for data loader
+  num_workers      : 0                    # number of workers for data loader
   WandB            : False                # whether to use Weights & Biases
   Load             : False                # whether to load model
   Save             : True                 # whether to save model
@@ -36,7 +36,7 @@ train: # train hyperparameters
   keep_num         : 1                    # number of models to keep
 
 infer: # inference hyperparameters
-  test_dataset     : 'data/processed/dataset1/test.h5'       # test dataset name
+  test_dataset     : 'data/processed/template/test.h5'       # test dataset name
   batch_size       : 1
   num_workers      : 0                    # number of workers for data loader
   Load             : True                 # whether to load model

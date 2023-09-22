@@ -31,10 +31,20 @@ class CheckPointManager:
         self.best_score: Optional[float] = None
         self.epoch: Optional[int]        = None
 
+    def save_config(self, config_name:str = 'config.yaml'):
+        """Save the config file."""
+        config_path = Path(self.ckpt_dir) / config_name
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        self.conf.save_yaml(config_path)
+
     def get_ckpts(self) -> List[Path]:
         model_name = self.conf.model_name
         ckpts = list(Path(self.ckpt_dir).glob(f"{model_name}_E_*_S_*.pth"))
-        return sorted(ckpts, key=lambda x: self.parse_ckpt_path(x)[0], reverse=self.lower_better)
+        def order(ckpt:Path):
+            score, epoch = self.parse_ckpt_path(ckpt)
+            score = -score if self.lower_better else score
+            return score, -epoch
+        return sorted(ckpts, key=order)
 
     def default_load_path(self) -> Path:
         """Get the default path to load the checkpoint."""
@@ -58,6 +68,7 @@ class CheckPointManager:
         except:
             print(f"Cannot parse the epoch and score from {ckpt.stem}")
             print("Set epoch and score to None.")
+            print(ckpt.stem)
             epoch = None
             score = None
         return score, epoch
@@ -136,6 +147,9 @@ class CheckPointManager:
 
         if self.scheduler is not None:
             save_dict['scheduler'] = self.scheduler.state_dict()
+
+        save_dict['best_score'] = score
+        save_dict['epoch'] = epoch
 
         torch.save(save_dict, ckpt_path)
 

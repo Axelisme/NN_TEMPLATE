@@ -11,7 +11,7 @@ from hyperparameters import base_conf, RAW_DATA_DIR, PROC_DATA_DIR
 import multiprocessing as mp
 
 # some parameters
-dataset_name = ""
+dataset_name = "template"
 split_ratio = base_conf.split_ratio
 SAVE_DIR = os.path.join(PROC_DATA_DIR, dataset_name)
 clear_folder(SAVE_DIR) # clear the folder before generating data
@@ -45,9 +45,9 @@ def generate_process_data(dataset_path:str,
                 saved_num += batch_num
 
 def data_loader(idx:int) -> np.ndarray:
-    return None
+    return np.random.randn(1,80,80), np.random.randint(0,10)
 
-data_dtype = np.dtype([("input", np.uint32, (2,)), ("label", np.uint8)])  # TODO: the data format in the dataset
+data_dtype = np.dtype([("input", np.float32, (1,80,80)), ("label", np.uint8)])  # TODO: the data format in the dataset
 data_length = 1000
 for mode, ratio in split_ratio.items():
     DATASET_PATH = os.path.join(SAVE_DIR, f"{mode}.h5")
