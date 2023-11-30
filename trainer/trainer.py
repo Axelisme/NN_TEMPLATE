@@ -3,79 +3,74 @@
 
 from typing import Dict
 from tqdm.auto import tqdm
+
 import torch
 from torch import nn
 from torch import Tensor
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
-from torchmetrics import MeanMetric, Metric
-from config.configClass import Config
+from torchmetrics import MeanMetric
 
 class Trainer:
     def __init__(self,
-                 config: Config,
                  model: nn.Module,
-                 device: torch.device,
                  loader: DataLoader,
                  optimizer: Optimizer,
                  criterion: nn.Module,
-                 statistic: Metric = MeanMetric(),):
+                 args,
+                 gradient_accumulation_steps:int = 1,
+                 **kwargs):
         '''initialize a trainer:
-        input: config: Config, the config of this model,
-                model: nn.Module, the model to train,
-                device: the device to use,
-                loader: the dataloader of train set,
-                optimizer: the optimizer of this model,
-                criterion: the criterion of this model,
-                statistic: the statistic method of the loss for each batch'''
-        self.config = config
+            model: nn.Module, the model to train,
+            loader: DataLoader, the data loader to load data,
+            optimizer: Optimizer, the optimizer to update parameters,
+            criterion: nn.Module, the criterion to compute loss,
+            args: Config, the config of this model'''
         self.model = model
-        self.device = device
-        self.dataloader = loader
+        self.loader = loader
         self.optimizer = optimizer
         self.criterion = criterion
-        self.statistic = statistic
+        self.gradient_accumulation_steps = gradient_accumulation_steps
+        self.result_status = MeanMetric()
+        self.device = torch.device(args.device)
 
-    def fit(self) -> Dict[str, Tensor]:
+    def fit(self, stepN = -1) -> Dict[str, Tensor]:
         '''train a model for one epoch:
-        output: dict('train_loss', loss), the loss of this epoch'''
+            output: dict('train_loss', loss), the loss of this epoch'''
         # move module to device
         self.model.to(self.device)
         self.criterion.to(self.device)
-        self.statistic.to(self.device)
+        self.result_status.to(self.device)
 
         # initial model and criterion
         self.model.train()
-        self.criterion.eval()
+        self.criterion.train()
 
         # initial optimizer
         self.optimizer.zero_grad()
 
         # initial statistic
-        self.statistic.reset()
-
-        # set gradient accumulation period
-        gradient_accumulation_steps = self.config.gradient_accumulation_steps
+        self.result_status.reset()
 
         # train for one epoch
-        batch_num = len(self.dataloader)
-        pbar = tqdm(self.dataloader, total=batch_num, desc='Train', dynamic_ncols=True)
-        for batch_idx, (input, label) in enumerate(pbar, start=1):
+        batch_num = len(self.loader)
+        pbar = tqdm(self.loader, total=batch_num, desc='Train', dynamic_ncols=True)
+        for batch_idx, (input, *other) in enumerate(pbar, start=1):
             # move input and label to device
             input = input.to(self.device)
-            label = label.to(self.device)
+            other = [item.to(self.device) for item in other if isinstance(item, Tensor)]
             # forward
             output:Tensor = self.model(input)
             # compute loss
-            loss:Tensor = self.criterion(output, label)
-            self.statistic.update(loss)
+            loss:Tensor = self.criterion(output, *other)
+            self.result_status.update(loss)
             # backward
             loss.backward()
             # update parameters
-            if batch_idx % gradient_accumulation_steps == 0 or batch_idx == batch_num:
+            if batch_idx % self.gradient_accumulation_steps == 0 or batch_idx == batch_num:
                 self.optimizer.step()
                 self.optimizer.zero_grad()
 
         # return statistic result
-        return self.statistic.compute()
+        return {'train_loss': self.result_status.compute()}
 

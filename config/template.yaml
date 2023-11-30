@@ -1,0 +1,91 @@
+architectures: &Arch
+  model:
+    select: 'TemplateModel'
+    TemplateModel:
+      module: 'model.customModel'
+      args:
+        input_size: 128
+        num_classes: &N 10
+
+  optimizer:
+    select: 'AdamW'
+    AdamW:
+      module: 'torch.optim'
+      args:
+        lr: 0.0003
+
+  scheduler:
+    select: 'ExponentialLR'
+    ExponentialLR:
+      module: 'torch.optim.lr_scheduler'
+      args:
+        gamma: 0.95
+
+  loss:
+    select: 'CrossEntropyLoss'
+    CrossEntropyLoss:
+      module: 'torch.nn'
+      args: {}
+
+  metric:
+    select:
+      - 'MulticlassAccuracy'
+    use_loss: True
+    MulticlassAccuracy:
+      module: 'torchmetrics.classification'
+      args:
+        num_classes: *N
+        average: 'macro'
+
+
+data:
+  train_loader:
+    dataset:
+      select: 'HDF5DataSet'
+      HDF5DataSet:
+        module: 'dataset.customDataset'
+        args:
+          dataset_path: './data/processed/template/train.h5'
+    args:
+      batch_size: 32
+      shuffle: True
+      pin_memory: True
+      num_workers: 0
+
+  valid_loader:
+    dataset:
+      select: 'HDF5DataSet'
+      HDF5DataSet:
+        module: 'dataset.customDataset'
+        args:
+          dataset_path: './data/processed/template/valid.h5'
+    args:
+      batch_size: 1
+      shuffle: False
+      pin_memory: True
+      num_workers: 0
+
+
+runner:
+  epochs: 100
+  trainer:
+    gradient_accumulation_steps: 1
+  valider: {}
+
+
+ckpt:
+  save_mod : 'max'
+  check_metric:
+    - 'MulticlassAccuracy'
+  ckpt_dir: ~
+  keep_num: 3
+
+
+WandB:
+  init_args:
+    project: 'Template'
+    name: 'Template_model'
+    config: *Arch
+  watch_args:
+    log: 'all'
+    log_freq: 1000

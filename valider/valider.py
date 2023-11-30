@@ -1,70 +1,59 @@
 
 """define a class to valid the model"""
 
-from typing import Dict, Optional
+from typing import Dict
 from tqdm.auto import tqdm
+
 import torch
 from torch import nn
 from torch import Tensor
 from torch.utils.data import DataLoader
-from torchmetrics import Metric, MetricCollection
-from config.configClass import Config
+from torchmetrics import MetricCollection
 
 class Valider:
     def __init__(self,
-                 config: Config,
                  model: nn.Module,
-                 device: torch.device,
                  loader: DataLoader,
-                 evaluators: MetricCollection = MetricCollection([])) -> None:
+                 metrics: MetricCollection,
+                 args,
+                 **kwargs) -> None:
         '''initialize a valider:
-        input: config: Config, the config of this model,
-               model: the model to test,
-               config: the config of this model,
-               loader: the dataloader of test set,
-               evaluators: the evaluator collection to use'''
-        self.config = config
+            model: nn.Module, the model to validate,
+            loader: DataLoader, the data loader to load data,
+            metrics: MetricCollection, the metrics to evaluate the model,
+            args: Config, the config of this model'''
         self.model = model
-        self.device = device
-        self.dataloader = loader
-        self.evaluators = evaluators
+        self.loader = loader
+        self.metrics = metrics
+        self.device = torch.device(args.device)
 
-
-    def add_evaluator(self, evaluator: Metric, name: Optional[str] = None) -> None:
-        '''add an evaluator to this tester:
-        input: evaluator: Evaluator, the evaluator to add,
-               name: str|None = None, the name of this evaluator'''
-        if name is None:
-            self.evaluators.add_metrics(evaluator)
-        else:
-            self.evaluators.add_metrics({name:evaluator})
 
     def eval(self) -> Dict[str, Tensor]:
         '''test a model on test set:
-        output: Dict, the result of this model'''
+            output: Dict, the result of this model'''
         # move module to device
         self.model.to(self.device)
-        self.evaluators.to(self.device)
+        self.metrics.to(self.device)
 
         # initial model
         self.model.eval()
 
         # initial evaluators
-        self.evaluators.reset()
+        self.metrics.reset()
 
         # evaluate this model
         with torch.no_grad():
-            batch_num = len(self.dataloader)
-            pbar = tqdm(self.dataloader, total=batch_num, desc='Test ', dynamic_ncols=True)
-            for batch_idx, (input, label) in enumerate(pbar, start=1):
+            batch_num = len(self.loader)
+            pbar = tqdm(self.loader, total=batch_num, desc='Valid ', dynamic_ncols=True)
+            for batch_idx, (input, *other) in enumerate(pbar, start=1):
                 # move input and label to device
                 input = input.to(self.device)
-                label = label.to(self.device)
+                other = [item.to(self.device) for item in other if isinstance(item, Tensor)]
                 # forward
                 output = self.model(input)
                 # compute and record score
-                self.evaluators.update(output, label)
+                self.metrics.update(output, *other)
 
         # return score
-        return self.evaluators.compute()
+        return self.metrics.compute()
 
