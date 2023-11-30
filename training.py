@@ -6,6 +6,7 @@ import importlib
 from torch.utils.data import DataLoader
 from torchmetrics import MetricCollection
 
+from util.io import show
 from util.utility import init
 from trainer.trainer import Trainer
 from valider.valider import Valider
@@ -15,27 +16,27 @@ from ckptmanager.manager import CheckPointManager
 def get_models(arch_conf):
     # select model
     model_select = arch_conf['model']['select']
-    print(f"[INFO] Using {model_select} as model.")
+    show(f"[INFO] Using {model_select} as model.")
     model_module = importlib.import_module(arch_conf['model'][model_select]['module'])
     model = getattr(model_module, model_select)(**arch_conf['model'][model_select]['args'])
 
     # select optimizer
     optim_select = arch_conf['optimizer']['select']
-    print(f"[INFO] Using {optim_select} as optimizer.")
+    show(f"[INFO] Using {optim_select} as optimizer.")
     optim_module = importlib.import_module(arch_conf['optimizer'][optim_select]['module'])
     optimizer = getattr(optim_module, optim_select)(
         model.parameters(), **arch_conf['optimizer'][optim_select]['args'])
 
     # select scheduler
     sched_select = arch_conf['scheduler']['select']
-    print(f"[INFO] Using {sched_select} as scheduler.")
+    show(f"[INFO] Using {sched_select} as scheduler.")
     sched_module = importlib.import_module(arch_conf['scheduler'][sched_select]['module'])
     scheduler = getattr(sched_module, sched_select)(
         optimizer, **arch_conf['scheduler'][sched_select]['args'])
 
     # select loss function
     loss_select = arch_conf['loss']['select']
-    print(f"[INFO] Using {loss_select} as loss function.")
+    show(f"[INFO] Using {loss_select} as loss function.")
     criter_module = importlib.import_module(arch_conf['loss'][loss_select]['module'])
     criterion = getattr(criter_module, loss_select)(**arch_conf['loss'][loss_select]['args'])
 
@@ -43,13 +44,13 @@ def get_models(arch_conf):
     metric_selects = arch_conf['metric']['select']
     metrics = {}
     for name in metric_selects:
-        print(f"[INFO] Using {name} as metric.")
+        show(f"[INFO] Using {name} as metric.")
         # use importlib to avoid weird bug of 'BinnedAveragePrecision' not found
         metric_module = importlib.import_module(arch_conf['metric'][name]['module'])
         metrics[name] = getattr(metric_module, name)(**arch_conf['metric'][name]['args'])
     if arch_conf['metric']['use_loss']:
-        print(f"[INFO] Using loss as metric.")
-        metrics['Loss'] = LossScore(criterion)
+        show(f"[INFO] Using loss as metric.")
+        metrics['Valid_loss'] = LossScore(criterion)
     metrics = MetricCollection(metrics)
 
     return model, optimizer, scheduler, criterion, metrics
@@ -58,7 +59,7 @@ def get_models(arch_conf):
 def get_dataloader(data_conf):
     def get_dataset(dataset_conf, mode):
         dataset_select = dataset_conf['select']
-        print(f"[INFO] Using {dataset_select} as {mode} dataset.")
+        show(f"[INFO] Using {dataset_select} as {mode} dataset.")
         dataset_module = importlib.import_module(dataset_conf[dataset_select]['module'])
         return getattr(dataset_module, dataset_select)(**dataset_conf[dataset_select]['args'])
 
@@ -77,17 +78,18 @@ def start_train(args, conf):
     model, optimizer, scheduler, criterion, metrics = get_models(arch_conf)
 
     # load model and optimizer from checkpoint if needed
-    ckpt_conf = conf['ckpt']
-    save_conf = {'args':vars(args), 'config':conf}
-    ckpt_manager = CheckPointManager(save_conf, args.name, model, **ckpt_conf)
-    print(f"[INFO] Saving checkpoint to {ckpt_manager.ckpt_dir}")
-    ckpt_manager.save_config(f"train_{time.strftime('%Y%m%d_%H%M%S')}.yaml")
-    if args.load is not None:
-        print(f"[INFO] Loading checkpoint from {args.load}")
-        ckpt_manager.load(ckpt_path=args.load)
+    if args.load is not None or not args.disable_auto_save:
+        ckpt_conf = conf['ckpt']
+        save_conf = {'args':vars(args), 'config':conf}
+        ckpt_manager = CheckPointManager(save_conf, args.name, model, **ckpt_conf)
+        show(f"[INFO] Saving checkpoint to {ckpt_manager.ckpt_dir}")
+        ckpt_manager.save_config(f"train_{time.strftime('%Y%m%d_%H%M%S')}.yaml")
+        if args.load is not None:
+            show(f"[INFO] Loading checkpoint from {args.load}")
+            ckpt_manager.load(ckpt_path=args.load)
 
     # register model to wandb if needed
-    if args.WandB:
+    if args.WandB and not args.not_track_params:
         wandb.watch(models=model, criterion=criterion, **conf['WandB']['watch_args'])
 
     # prepare dataset and dataloader
@@ -101,7 +103,7 @@ def start_train(args, conf):
 
     # start training
     for epoch in range(1, runner_conf['epochs']+1):
-        print('-'*79)
+        show('-'*79)
 
         train_result = trainer.fit()
         valid_result = valider.eval()
@@ -111,7 +113,8 @@ def start_train(args, conf):
 
         scheduler.step()
 
-        ckpt_manager.update(valid_result, epoch, args.overwrite)
+        if not args.disable_auto_save:
+            ckpt_manager.update(valid_result, epoch, args.overwrite)
 
         if args.WandB:
             wandb.log({'lr':lr}, step=epoch, commit=False)
@@ -122,14 +125,14 @@ def start_train(args, conf):
 def show_result(conf:dict, epoch, lr, train_result:dict, valid_result:dict):
     """Print result of training and validation."""
     # print result
-    print(f'Epoch: ({epoch} / {conf["epochs"]})')
-    print(f'lr: {lr:0.3e}')
-    print("Train result:")
+    show(f'Epoch: ({epoch} / {conf["epochs"]})')
+    show(f'lr: {lr:0.3e}')
+    show("Train result:")
     for name, evaluator in train_result.items():
-        print(f'\t{name}: {evaluator:0.4f}')
-    print("Valid result:")
+        show(f'\t{name}: {evaluator:0.4f}')
+    show("Valid result:")
     for name, evaluator in valid_result.items():
-        print(f'\t{name}: {evaluator:0.4f}')
+        show(f'\t{name}: {evaluator:0.4f}')
 
 
 def main():
@@ -140,10 +143,15 @@ def main():
     parser.add_argument('-c', '--config', type=str, default='config/template.yaml', help='path to config file')
     parser.add_argument('-s', '--seed', type=int, default=0, help='random seed')
     parser.add_argument('--WandB', action='store_true', help='use W&B to log')
+    parser.add_argument('--not-track-params', action='store_true', help='not track params in W&B')
+    parser.add_argument('--disable-auto-save', action='store_true', help='disable auto save')
     parser.add_argument('--load', default=None, help='path to checkpoint file')
     parser.add_argument('--device', type=str, default='cuda:0', help='device to use')
+    parser.add_argument('--slient', action='store_true', help='slient or not')
     parser.add_argument('--overwrite', action='store_true', help='overwrite existing ckpt or not')
     args = parser.parse_args()
+
+    show.set_slient(args.slient)
 
     # load config
     with open(args.config, 'r') as f:
@@ -152,8 +160,8 @@ def main():
     # initialize
     init(args.seed)
     if args.WandB:
-        print(f'[INFO] Using W&B to log.')
-        wandb.init(**conf['WandB']['init_args'])
+        show(f'[INFO] Using W&B to log.')
+        wandb.init(project=conf['WandB']['project'], **conf['WandB']['init_args'])
 
     # start training
     start_train(args, conf)

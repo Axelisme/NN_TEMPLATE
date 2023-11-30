@@ -7,8 +7,9 @@ import torch
 from torch.backends import cudnn
 
 
-def set_seed(seed: int, cudnn_benchmark = False) -> None:
+def set_seed(seed: int) -> int:
     """set seed for reproducibility"""
+    old_seed = torch.initial_seed()
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
@@ -16,8 +17,7 @@ def set_seed(seed: int, cudnn_benchmark = False) -> None:
     np.random.seed(seed)
     random.seed(seed)
     cudnn.deterministic = True
-    cudnn.benchmark = cudnn_benchmark
-
+    return old_seed
 
 def init(seed : int, start_method:str = 'forkserver') -> None:
     """Initialize the script."""
@@ -25,7 +25,8 @@ def init(seed : int, start_method:str = 'forkserver') -> None:
     torch.multiprocessing.set_start_method(start_method, force=True)
     torch.set_float32_matmul_precision('medium')
     # set random seed
-    set_seed(seed=seed, cudnn_benchmark=True)
+    set_seed(seed=seed)
+    cudnn.benchmark = True
 
 
 def get_cuda() -> torch.device:

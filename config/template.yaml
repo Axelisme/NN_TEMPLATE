@@ -9,10 +9,11 @@ architectures: &Arch
 
   optimizer:
     select: 'AdamW'
-    AdamW:
+    AdamW: &AdamW_args
       module: 'torch.optim'
       args:
         lr: 0.0003
+    Adam: *AdamW_args
 
   scheduler:
     select: 'ExponentialLR'
@@ -50,7 +51,7 @@ data:
       batch_size: 32
       shuffle: True
       pin_memory: True
-      num_workers: 0
+      num_workers: 4
 
   valid_loader:
     dataset:
@@ -82,10 +83,52 @@ ckpt:
 
 
 WandB:
+  project: &P 'Template_project'
   init_args:
-    project: 'Template'
     name: 'Template_model'
     config: *Arch
   watch_args:
     log: 'all'
     log_freq: 1000
+  sweep:
+    num_trials: 30
+    config:
+      name: 'Template_sweep'
+      method: 'random'
+      metric:
+        name: 'Valid_loss'
+        goal: 'minimize'
+      parameters:
+        runner:
+          parameters:
+            epochs:
+              value: 30
+        architectures:
+          parameters:
+            optimizer:
+              parameters:
+                select:
+                  values:
+                    - 'AdamW'
+                    - 'Adam'
+                AdamW:
+                  parameters:
+                    args:
+                      parameters:
+                        lr:
+                          values:
+                            - 0.0001
+                            - 0.0003
+                            - 0.0005
+        data:
+          parameters:
+            train_loader:
+              parameters:
+                args:
+                  parameters:
+                    batch_size:
+                      values:
+                        - 16
+                        - 32
+                        - 64
+

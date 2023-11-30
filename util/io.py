@@ -10,6 +10,22 @@ import matplotlib.pyplot as plt
 import itertools
 
 
+class PrintO(object):
+    def __init__(self):
+        self.slient = False
+
+    def __call__(self, statement:str):
+        """print the statement to the console"""
+        if not self.slient:
+            print(statement)
+
+    def set_slient(self, slient:bool):
+        """set slient or not"""
+        self.slient = slient
+
+show = PrintO()
+
+
 def clear_folder(path:str):
     """clear the folder"""
     if os.path.exists(path):

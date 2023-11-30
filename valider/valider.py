@@ -10,6 +10,8 @@ from torch import Tensor
 from torch.utils.data import DataLoader
 from torchmetrics import MetricCollection
 
+from util.utility import set_seed
+
 class Valider:
     def __init__(self,
                  model: nn.Module,
@@ -25,8 +27,9 @@ class Valider:
         self.model = model
         self.loader = loader
         self.metrics = metrics
-        self.device = torch.device(args.device)
 
+        self.device = torch.device(args.device)
+        self.slient = args.slient
 
     def eval(self) -> Dict[str, Tensor]:
         '''test a model on test set:
@@ -42,9 +45,10 @@ class Valider:
         self.metrics.reset()
 
         # evaluate this model
+        old_seed = set_seed(0)
         with torch.no_grad():
             batch_num = len(self.loader)
-            pbar = tqdm(self.loader, total=batch_num, desc='Valid ', dynamic_ncols=True)
+            pbar = tqdm(self.loader, total=batch_num, desc='Valid ', dynamic_ncols=True, disable=self.slient)
             for batch_idx, (input, *other) in enumerate(pbar, start=1):
                 # move input and label to device
                 input = input.to(self.device)
@@ -53,6 +57,7 @@ class Valider:
                 output = self.model(input)
                 # compute and record score
                 self.metrics.update(output, *other)
+        set_seed(old_seed)
 
         # return score
         return self.metrics.compute()

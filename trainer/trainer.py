@@ -31,8 +31,10 @@ class Trainer:
         self.optimizer = optimizer
         self.criterion = criterion
         self.gradient_accumulation_steps = gradient_accumulation_steps
+
         self.result_status = MeanMetric()
         self.device = torch.device(args.device)
+        self.slient = args.slient
 
     def fit(self, stepN = -1) -> Dict[str, Tensor]:
         '''train a model for one epoch:
@@ -54,7 +56,7 @@ class Trainer:
 
         # train for one epoch
         batch_num = len(self.loader)
-        pbar = tqdm(self.loader, total=batch_num, desc='Train', dynamic_ncols=True)
+        pbar = tqdm(self.loader, total=batch_num, desc='Train', dynamic_ncols=True, disable=self.slient)
         for batch_idx, (input, *other) in enumerate(pbar, start=1):
             # move input and label to device
             input = input.to(self.device)
@@ -72,5 +74,5 @@ class Trainer:
                 self.optimizer.zero_grad()
 
         # return statistic result
-        return {'train_loss': self.result_status.compute()}
+        return {'Train_loss': self.result_status.compute()}
 
