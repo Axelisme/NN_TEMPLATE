@@ -191,7 +191,7 @@ def main():
     # parse arguments
     parser = argparse.ArgumentParser(description='Training model.')
     parser.add_argument('-n', '--name', type=str, required=True, help='name of this training')
-    parser.add_argument('-c', '--config', type=str, default='config/template.yaml', help='path to config file')
+    parser.add_argument('-c', '--config', type=str, default='configs/template.yaml', help='path to config file')
     parser.add_argument('-s', '--seed', type=int, default=0, help='random seed')
     parser.add_argument('--WandB', action='store_true', help='use W&B to log')
     parser.add_argument('--not_track_params', action='store_true', help='not track params in W&B')
