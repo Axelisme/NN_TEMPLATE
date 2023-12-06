@@ -19,7 +19,7 @@ class CustomEMScore(Metric):
         self.add_state("correct", default=torch.tensor(0), dist_reduce_fx="sum")
         self.add_state("total", default=torch.tensor(0), dist_reduce_fx="sum")
 
-    def update(self, output: Tensor, label: Tensor) -> None:
+    def update(self, output: Tensor, label: Tensor, *args, **kwargs) -> None:
         """update the metric"""
         pred = output.argmax(dim=-1)
         self.correct += (pred == label).sum().item() # type: ignore

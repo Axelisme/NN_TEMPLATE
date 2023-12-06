@@ -22,7 +22,7 @@ class LossScore(Metric):
         self.add_state("total_loss", default=torch.tensor(0.), dist_reduce_fx="sum")
         self.add_state("total_num", default=torch.tensor(0), dist_reduce_fx="sum")
 
-    def update(self, output: Tensor, label: Tensor) -> None:
+    def update(self, output: Tensor, label: Tensor, *args, **kwargs) -> None:
         """update the metric"""
         original_mode = self.criterion.training
         self.criterion.eval()

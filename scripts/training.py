@@ -115,7 +115,10 @@ def start_train(args: Namespace, conf: Dict[str, Dict|Any]):
     best_result = {}
     pbar = tqdm(total=runner_conf['total_steps'], desc='Overall', dynamic_ncols=True, disable=args.slient)
     for step in range(1, runner_conf['total_steps'] + 1):
-        runner.train_one_step()
+        if runner_conf['step_mod'] == 'grad':
+            runner.train_one_step()
+        elif runner_conf['step_mod'] == 'epoch':
+            runner.train_one_epoch()
 
         pbar.update()
 

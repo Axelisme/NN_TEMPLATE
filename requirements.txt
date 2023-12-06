@@ -5,6 +5,8 @@ torchmetrics
 tqdm
 wandb
 numpy
+joblib
 pyyaml
 h5py
+opencv-python
 matplotlib

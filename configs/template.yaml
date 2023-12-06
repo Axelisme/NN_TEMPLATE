@@ -22,6 +22,10 @@ architectures: &Arch
       module: 'torch.optim.lr_scheduler'
       args:
         gamma: 0.9995
+    ConstantLR:
+      module: 'torch.optim.lr_scheduler'
+      args:
+        total_iters: 0
 
   loss:
     select: 'CrossEntropyLoss'
@@ -69,12 +73,13 @@ data:
 
 
 runner:
-  total_steps: 1000
+  step_mod: 'grad'
+  total_steps: 10000
   log_freq: 100
-  dev_freq: 500
+  dev_freq: 1000
   save_freq: 500
   init_args:
-    gradient_accumulation_steps: 16
+    gradient_accumulation_steps: 1
 
 
 ckpt:
