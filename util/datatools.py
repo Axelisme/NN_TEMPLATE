@@ -10,6 +10,7 @@ import multiprocessing as mp
 from typing import Callable, Dict
 from tqdm.auto import tqdm
 
+
 def generate_hdf5_data(dataset_path:str,
                           data_dtype:np.dtype,
                           data_loader:Callable,
@@ -90,3 +91,13 @@ def load_subfolder_as_label(root: str, loader = None, max_num = 1000):
             datas.append((data, label_num))
         label_num += 1
     return datas, label_names
+
+
+def cycle_iter(iterable, callback=None):
+    """cycle iterator"""
+    while True:
+        for item in iterable:
+            yield item
+        else:
+            if callback:
+                callback()

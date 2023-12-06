@@ -4,6 +4,7 @@ define a class to schedule learning rate
 
 from torch.optim.lr_scheduler import _LRScheduler
 
+
 class TempleteScheduler(_LRScheduler):
     """define a class to schedule learning rate"""
     def __init__(self, optimizer, last_epoch=-1) -> None:

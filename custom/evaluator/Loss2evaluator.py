@@ -1,11 +1,13 @@
 """
 define a class for evaluating a model by loss
 """
+
+from typing import Optional
+
 import torch
 from torch import Tensor
 from torch.nn import Module
 from torchmetrics import Metric
-from typing import Optional
 
 
 class LossScore(Metric):

@@ -1,10 +1,11 @@
 
 """define a class to calculate em score"""
 
+from typing import Optional
+
 import torch
 from torch import Tensor
 from torchmetrics import Metric
-from typing import Optional
 
 
 class CustomEMScore(Metric):

@@ -3,17 +3,19 @@ import yaml
 import wandb
 import argparse
 import importlib
+from typing import Dict, Any
+from argparse import Namespace
 from torch.utils.data import DataLoader
 from torchmetrics import MetricCollection
+from tqdm.auto import tqdm
 
 from util.io import show
 from util.utility import init
-from trainer.trainer import Trainer
-from valider.valider import Valider
-from evaluator.Loss2evaluator import LossScore
-from ckptmanager.manager import CheckPointManager
+from modules.runner import Runner
+from modules.ckptmanager import CheckPointManager
+from custom.evaluator.Loss2evaluator import LossScore
 
-def get_models(arch_conf):
+def get_models(arch_conf:Dict[str, Dict|Any]):
     # select model
     model_select = arch_conf['model']['select']
     show(f"[INFO] Using {model_select} as model.")
@@ -50,13 +52,13 @@ def get_models(arch_conf):
         metrics[name] = getattr(metric_module, name)(**arch_conf['metric'][name]['args'])
     if arch_conf['metric']['use_loss']:
         show(f"[INFO] Using loss as metric.")
-        metrics['Valid_loss'] = LossScore(criterion)
+        metrics['valid_loss'] = LossScore(criterion)
     metrics = MetricCollection(metrics)
 
     return model, optimizer, scheduler, criterion, metrics
 
 
-def get_dataloader(data_conf):
+def get_dataloader(data_conf:Dict[str, Dict|Any]):
     def get_dataset(dataset_conf, mode):
         dataset_select = dataset_conf['select']
         show(f"[INFO] Using {dataset_select} as {mode} dataset.")
@@ -71,20 +73,20 @@ def get_dataloader(data_conf):
     return train_loader, valid_loader
 
 
-def start_train(args, conf):
+def start_train(args: Namespace, conf: Dict[str, Dict|Any]):
     """Training model base on given config."""
     # load models
     arch_conf = conf['architectures']
     model, optimizer, scheduler, criterion, metrics = get_models(arch_conf)
 
     # load model and optimizer from checkpoint if needed
-    if args.load is not None or not args.disable_auto_save:
+    if args.load or not args.disable_save:
         ckpt_conf = conf['ckpt']
         save_conf = {'args':vars(args), 'config':conf}
         ckpt_manager = CheckPointManager(save_conf, args.name, model, **ckpt_conf)
         show(f"[INFO] Saving checkpoint to {ckpt_manager.ckpt_dir}")
         ckpt_manager.save_config(f"train_{time.strftime('%Y%m%d_%H%M%S')}.yaml")
-        if args.load is not None:
+        if args.load:
             show(f"[INFO] Loading checkpoint from {args.load}")
             ckpt_manager.load(ckpt_path=args.load)
 
@@ -98,38 +100,87 @@ def start_train(args, conf):
 
     # create trainer and valider
     runner_conf = conf['runner']
-    trainer = Trainer(model, train_loader, optimizer, criterion, args, **runner_conf['trainer'])
-    valider = Valider(model, valid_loader, metrics, args, **runner_conf['valider'])
+    runner = Runner(model,
+                    train_loader,
+                    valid_loader,
+                    optimizer,
+                    scheduler,
+                    criterion,
+                    metrics,
+                    args,
+                    **runner_conf['init_args']
+                )
 
     # start training
-    for epoch in range(1, runner_conf['epochs']+1):
-        show('-'*79)
+    best_result = {}
+    pbar = tqdm(total=runner_conf['total_steps'], desc='Overall', dynamic_ncols=True, disable=args.slient)
+    for step in range(1, runner_conf['total_steps'] + 1):
+        runner.train_one_step()
 
-        train_result = trainer.fit()
-        valid_result = valider.eval()
+        pbar.update()
 
-        lr = optimizer.param_groups[0]['lr']
-        show_result(runner_conf, epoch, lr, train_result, valid_result)
+        if step % runner_conf['log_freq'] == 0 or step == runner_conf['total_steps']:
+            train_result = runner.pop_train_result()
+            show_train_result(runner_conf, step, runner.lr, train_result)
+            if args.WandB:
+                wandb.log(train_result, step=step, commit=False)
 
-        scheduler.step()
+        if step % runner_conf['dev_freq'] == 0 or step == runner_conf['total_steps']:
+            runner.valid_one_epoch()
+            current_result = runner.pop_valid_result()
+            show_valid_result(runner_conf, step, current_result)
+            if args.WandB:
+                wandb.log(current_result, step=step, commit=False)
+            if not args.disable_save:
+                if check_better(ckpt_conf, current_result, best_result):
+                    best_result = current_result
+                    ckpt_manager.save(ckpt_name='dev-best.pth', overwrite=True)
 
-        if not args.disable_auto_save:
-            ckpt_manager.update(valid_result, epoch, args.overwrite)
+        if step % runner_conf['save_freq'] == 0 and not args.disable_save:
+            ckpt_manager.save(ckpt_name=f'dev-step-{step}.pth', overwrite=args.overwrite)
 
         if args.WandB:
-            wandb.log({'lr':lr}, step=epoch, commit=False)
-            wandb.log(train_result, step=epoch, commit=False)
-            wandb.log(valid_result, step=epoch, commit=True)
+            wandb.log({'lr':runner.lr}, step=step, commit=True)
+    pbar.close()
 
 
-def show_result(conf:dict, epoch, lr, train_result:dict, valid_result:dict):
-    """Print result of training and validation."""
+def check_better(conf, current_result, best_result):
+    for name in conf['check_metrics']:
+        if current_metric := current_result.get(name):
+            if best_metric := best_result.get(name):
+                if current_metric == best_metric:
+                    continue
+                return conf['save_mod'] == 'max' and current_metric > best_metric or \
+                        conf['save_mod'] == 'min' and current_metric < best_metric
+            else:
+                return True
+        else:
+            continue
+    return False
+
+
+def show_train_result(
+        conf         : Dict[str,Dict|Any],
+        step         : int,
+        lr           : float,
+        train_result : Dict[str,float]
+    ):
+    """Print result of training."""
     # print result
-    show(f'Epoch: ({epoch} / {conf["epochs"]})')
+    show(f'Step: ({step} / {conf["total_steps"]})')
     show(f'lr: {lr:0.3e}')
     show("Train result:")
     for name, evaluator in train_result.items():
         show(f'\t{name}: {evaluator:0.4f}')
+
+def show_valid_result(
+        conf         : Dict[str,Dict|Any],
+        step         : int,
+        valid_result : Dict[str,float]
+    ):
+    """Print result of validation."""
+    # print result
+    show(f'Step: ({step} / {conf["total_steps"]})')
     show("Valid result:")
     for name, evaluator in valid_result.items():
         show(f'\t{name}: {evaluator:0.4f}')
@@ -143,8 +194,8 @@ def main():
     parser.add_argument('-c', '--config', type=str, default='config/template.yaml', help='path to config file')
     parser.add_argument('-s', '--seed', type=int, default=0, help='random seed')
     parser.add_argument('--WandB', action='store_true', help='use W&B to log')
-    parser.add_argument('--not-track-params', action='store_true', help='not track params in W&B')
-    parser.add_argument('--disable-auto-save', action='store_true', help='disable auto save')
+    parser.add_argument('--not_track_params', action='store_true', help='not track params in W&B')
+    parser.add_argument('--disable_save', action='store_true', help='disable auto save ckpt')
     parser.add_argument('--load', default=None, help='path to checkpoint file')
     parser.add_argument('--device', type=str, default='cuda:0', help='device to use')
     parser.add_argument('--slient', action='store_true', help='slient or not')

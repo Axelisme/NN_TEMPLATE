@@ -2,10 +2,11 @@ architectures: &Arch
   model:
     select: 'TemplateModel'
     TemplateModel:
-      module: 'model.customModel'
+      module: 'custom.model.template'
       args:
         input_size: 128
-        num_classes: &N 10
+        num_classes: &N 8
+        hidden_size: 256
 
   optimizer:
     select: 'AdamW'
@@ -20,7 +21,7 @@ architectures: &Arch
     ExponentialLR:
       module: 'torch.optim.lr_scheduler'
       args:
-        gamma: 0.95
+        gamma: 0.9995
 
   loss:
     select: 'CrossEntropyLoss'
@@ -44,20 +45,20 @@ data:
     dataset:
       select: 'HDF5DataSet'
       HDF5DataSet:
-        module: 'dataset.customDataset'
+        module: 'custom.dataset.hdf5_dataset'
         args:
           dataset_path: './data/processed/template/train.h5'
     args:
       batch_size: 32
       shuffle: True
       pin_memory: True
-      num_workers: 4
+      num_workers: 0
 
   valid_loader:
     dataset:
       select: 'HDF5DataSet'
       HDF5DataSet:
-        module: 'dataset.customDataset'
+        module: 'custom.dataset.hdf5_dataset'
         args:
           dataset_path: './data/processed/template/valid.h5'
     args:
@@ -68,17 +69,19 @@ data:
 
 
 runner:
-  epochs: 100
-  trainer:
-    gradient_accumulation_steps: 1
-  valider: {}
+  total_steps: 1000
+  log_freq: 100
+  dev_freq: 500
+  save_freq: 500
+  init_args:
+    gradient_accumulation_steps: 16
 
 
 ckpt:
   save_mod : 'max'
-  check_metric:
+  check_metrics:
     - 'MulticlassAccuracy'
-  ckpt_dir: ~
+  ckpt_dir: ~  # default: './data/saved_models/{name}'
   keep_num: 3
 
 
@@ -101,8 +104,12 @@ WandB:
       parameters:
         runner:
           parameters:
-            epochs:
-              value: 30
+            total_steps:
+              value: 100
+            log_freq:
+              value: 50
+            dev_freq:
+              value: 50
         architectures:
           parameters:
             optimizer:
