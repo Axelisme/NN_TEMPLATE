@@ -14,10 +14,10 @@ class PrintO(object):
     def __init__(self):
         self.slient = False
 
-    def __call__(self, statement:str):
+    def __call__(self, *args, **kwargs):
         """print the statement to the console"""
         if not self.slient:
-            print(statement)
+            print(*args, **kwargs)
 
     def set_slient(self, slient:bool):
         """set slient or not"""

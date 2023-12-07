@@ -17,6 +17,7 @@ from torchmetrics import MetricCollection
 from torch.optim.lr_scheduler import _LRScheduler
 
 from util.datatools import cycle_iter
+from util.utility import set_seed
 
 
 class Runner:
@@ -151,6 +152,7 @@ class Runner:
 
 
     def valid_one_epoch(self):
+        old_seed = set_seed(0)
         self.set_eval()
         with torch.no_grad():
             for input, *other in tqdm(self.valid_loader, desc='Valid ', dynamic_ncols=True, disable=self.args.slient):
@@ -163,4 +165,5 @@ class Runner:
 
                 # compute and record score
                 self.valid_metrics.update(output, *other)
+        set_seed(old_seed)
 
