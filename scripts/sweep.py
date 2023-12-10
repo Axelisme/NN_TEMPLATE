@@ -5,7 +5,7 @@ import yaml
 import wandb
 import argparse
 
-from scripts.training import start_train
+from scripts.run import start_train
 from util.utility import init
 from util.io import show
 
@@ -29,6 +29,7 @@ def train_for_sweep():
     override_conf(conf, wandb.config)
 
     args = argparse.Namespace()
+    args.mode = 'train'
     args.load = None
     args.disable_save = True
     args.WandB = True
