@@ -19,7 +19,7 @@ split_ratio = {
     "test" : 0.1
 }
 postfix = ".jpg"
-labels = ["B1", "B2-1", "B2-2", "B2-3", "B3", "B4", "B5", "B6"]
+labels = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
 label_dict = {label: idx for idx, label in enumerate(labels)}
 
 
@@ -28,7 +28,6 @@ def transform_image(src_path, dst_path):
     """transform the image from src_path to dst_path"""
     img = PIL.Image.open(src_path)
     img = img.resize((1920, 960))
-    img = img.resize(size=(224, 224), box=(0, 140, 1920, 820))
     img = img.convert("RGB")
     img.save(dst_path)
 
