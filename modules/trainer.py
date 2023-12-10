@@ -12,38 +12,34 @@ from torch import nn
 from torch import Tensor
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
-from torchmetrics import MeanMetric
-from torchmetrics import MetricCollection
+from torchmetrics import MeanMetric, MetricCollection
 from torch.optim.lr_scheduler import _LRScheduler
 
 from util.datatools import cycle_iter
-from util.utility import set_seed
 
 
-class Runner:
+class Trainer:
     def __init__(self,
                  model: nn.Module,
                  train_loader: DataLoader,
-                 valid_loader: DataLoader,
                  optimizer: Optimizer,
                  scheduler: _LRScheduler,
                  criterion: nn.Module,
-                 metrics: MetricCollection,
                  args: Namespace,
                  grad_acc_steps:int = 1,
                  **kwargs):
         self.model = model
         self.train_loader = train_loader
-        self.valid_loader = valid_loader
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.criterion = criterion
-        self.valid_metrics = metrics
         self.args = args
 
         self.grad_acc_steps = grad_acc_steps
 
-        self.train_metrics = MeanMetric()
+        self.train_metrics = MetricCollection({
+            'train_loss': MeanMetric(),
+        })
         self.device = torch.device(args.device)
 
         self.train_bar = tqdm(total=len(train_loader), desc='Train', dynamic_ncols=True, disable=args.slient)
@@ -58,10 +54,8 @@ class Runner:
         '''initial the model and criterion'''
         self.model.to(self.device)
         self.criterion.to(self.device)
-        self.valid_metrics.to(self.device)
         self.train_metrics.to(self.device)
 
-        self.valid_metrics.reset()
         self.train_metrics.reset()
 
 
@@ -78,37 +72,24 @@ class Runner:
         self.criterion.train()
 
 
-    def set_eval(self):
-        '''set model and criterion to eval mode'''
-        self.model.eval()
-        self.criterion.eval()
-
-
-    def pop_train_result(self) -> Dict[str, Tensor]:
+    def pop_result(self) -> Dict[str, Tensor]:
         '''get the average loss of training and reset the statistic of loss'''
         loss = self.train_metrics.compute()
         self.train_metrics.reset()
-        return {'train_loss': loss}
+        return loss
 
 
-    def pop_valid_result(self) -> Dict[str, Tensor]:
-        '''get the score of validation and reset the statistic of score'''
-        scores = self.valid_metrics.compute()
-        self.valid_metrics.reset()
-        return scores
-
-
-    def train_one_step(self):
+    def one_step(self):
         self.set_train()
         for steps, (input, *other) in enumerate(self.cycle_loader, start=1):
             # move input and label to device
             input = input.to(self.device)
-            other = [item.to(self.device) for item in other if isinstance(item, Tensor)]
 
             # forward
             output:Tensor = self.model(input)
 
             # compute loss and record
+            other = [item.to(self.device) for item in other if isinstance(item, Tensor)]
             loss:Tensor = self.criterion(output, *other)
             self.train_metrics.update(loss)
 
@@ -125,19 +106,20 @@ class Runner:
                 break
 
 
-    def train_one_epoch(self):
+    def one_epoch(self):
         self.set_train()
         for steps, (input, *other) in enumerate(self.train_loader, start=1):
-            # move input and label to device
+            # move input to device
             input = input.to(self.device)
-            other = [item.to(self.device) for item in other if isinstance(item, Tensor)]
 
             # forward
             output:Tensor = self.model(input)
 
             # compute loss and record
+            other = [item.to(self.device) for item in other if isinstance(item, Tensor)]
             loss:Tensor = self.criterion(output, *other)
             self.train_metrics.update(loss)
+            del output, input, other
 
             # backward
             (loss / self.grad_acc_steps).backward()
@@ -149,21 +131,4 @@ class Runner:
                 self.optimizer.step()
                 self.optimizer.zero_grad()
                 self.scheduler.step()
-
-
-    def valid_one_epoch(self):
-        old_seed = set_seed(0)
-        self.set_eval()
-        with torch.no_grad():
-            for input, *other in tqdm(self.valid_loader, desc='Valid ', dynamic_ncols=True, disable=self.args.slient):
-                # move input and label to device
-                input = input.to(self.device)
-                other = [item.to(self.device) for item in other if isinstance(item, Tensor)]
-
-                # forward
-                output:Tensor = self.model(input)
-
-                # compute and record score
-                self.valid_metrics.update(output, *other)
-        set_seed(old_seed)
 

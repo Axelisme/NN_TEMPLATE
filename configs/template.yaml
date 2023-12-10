@@ -74,12 +74,13 @@ data:
 
 runner:
   step_mod: 'grad'
-  total_steps: 10000
+  total_steps: 1100
   log_freq: 100
   dev_freq: 1000
   save_freq: 500
-  init_args:
+  trainer_args:
     gradient_accumulation_steps: 1
+  valider_args: {}
 
 
 ckpt:

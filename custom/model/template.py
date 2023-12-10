@@ -19,7 +19,7 @@ class TemplateModel(nn.Module):
         x = self.fn1(x)
         x = self.fn2(x)
         # waste some time
-        for _ in range(1000):
+        for _ in range(100):
             y = torch.rand(100, 100)
         return x
 

@@ -8,6 +8,7 @@ from functools import wraps
 import numpy as np
 import matplotlib.pyplot as plt
 import itertools
+from typing import Dict, Any
 
 
 class PrintO(object):
@@ -120,3 +121,31 @@ def plot_confusion_matrix(cm, class_names, path = None, title='Confusion matrix'
         plt.savefig(path)
     plt.show()
     plt.close()
+
+
+def show_train_result(
+        conf         : Dict[str,Dict|Any],
+        step         : int,
+        lr           : float,
+        train_result : Dict[str,float]
+    ):
+    """Print result of training."""
+    # print result
+    show(f'Step: ({step} / {conf["total_steps"]})')
+    show(f'lr: {lr:0.3e}')
+    show("Train result:")
+    for name, evaluator in train_result.items():
+        show(f'\t{name}: {evaluator:0.4f}')
+
+
+def show_valid_result(
+        conf         : Dict[str,Dict|Any],
+        step         : int,
+        valid_result : Dict[str,float]
+    ):
+    """Print result of validation."""
+    # print result
+    show(f'Step: ({step} / {conf["total_steps"]})')
+    show("Valid result:")
+    for name, evaluator in valid_result.items():
+        show(f'\t{name}: {evaluator:0.4f}')

@@ -20,6 +20,7 @@ def set_seed(seed: int) -> int:
     cudnn.deterministic = True
     return old_seed
 
+
 def init(seed : int, start_method:str = 'forkserver') -> None:
     """Initialize the script."""
     # set float32 matmul precision
@@ -35,3 +36,18 @@ def get_cuda() -> torch.device:
         return torch.device('cuda')
     else:
         raise RuntimeError('No cuda device available.')
+
+
+def check_better(conf, current_result, best_result):
+    for name in conf['check_metrics']:
+        if current_metric := current_result.get(name):
+            if best_metric := best_result.get(name):
+                if current_metric == best_metric:
+                    continue
+                return conf['save_mod'] == 'max' and current_metric > best_metric or \
+                        conf['save_mod'] == 'min' and current_metric < best_metric
+            else:
+                return True
+        else:
+            continue
+    return False
