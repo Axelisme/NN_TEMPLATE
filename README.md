@@ -3,16 +3,19 @@
 Dependence: `torch`, `tqdm`, `torchmetric`, `wandb`, `numpy`,`pyyaml`
 
 ## Usage
-### generate hdf5 dataset
+### generate dataset
 ```bash
-python -m scripts.hdf5_generator
+python -m scripts.{xxx}_generator
 ```
 ### train
 Default config path: `configs/template.yaml`
 ```bash
-python -m scripts.training -n {name}
+python -m scripts.run      -m {train/evaluate}
+                           -n {name}
                            [-c {config_path}]
                            [-s {seed}]
+                           [--train_loader {loader}]
+                           [--valid_loader {loader}]
                            [--WandB]
                            [--load {path}]
                            [--slient]

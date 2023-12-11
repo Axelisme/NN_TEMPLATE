@@ -65,11 +65,10 @@ def get_modules_for_eval(metric_conf:Dict[str, Dict|Any], criterion=None):
     return MetricCollection(metrics)
 
 
-def get_dataset(dataset_conf, mode):
-    dataset_select = dataset_conf['select']
-    show(f"[INFO] Using {dataset_select} as {mode} dataset.")
-    dataset_module = importlib.import_module(dataset_conf[dataset_select]['module'])
-    return getattr(dataset_module, dataset_select)(**dataset_conf[dataset_select]['args'])
+def get_dataset(dataset_conf:Dict, select:str):
+    dataset_select = dataset_conf[select]
+    dataset_module = importlib.import_module(dataset_select['module'])
+    return getattr(dataset_module, dataset_select['name'])(**dataset_select['args'])
 
 
 def start_train(args: Namespace, conf: Dict[str, Dict|Any]):
@@ -104,11 +103,13 @@ def start_train(args: Namespace, conf: Dict[str, Dict|Any]):
         wandb.watch(models=model, criterion=criterion, **conf['WandB']['watch_args'])
 
     # prepare dataset and dataloader
-    data_conf = conf['data']
-    train_dataset = get_dataset(data_conf['train_loader']['dataset'], 'train')
-    valid_dataset = get_dataset(data_conf['valid_loader']['dataset'], 'valid')
-    train_loader = DataLoader(train_dataset, **data_conf['train_loader']['args'])
-    valid_loader = DataLoader(valid_dataset, **data_conf['valid_loader']['args'])
+    loader_conf = conf['data']['dataloaders']
+    show(f"[INFO] Using {loader_conf[args.train_loader]['dataset']} as train dataset.")
+    show(f"[INFO] Using {loader_conf[args.valid_loader]['dataset']} as valid dataset.")
+    train_dataset = get_dataset(conf['data']['datasets'], loader_conf[args.train_loader]['dataset'])
+    valid_dataset = get_dataset(conf['data']['datasets'], loader_conf[args.valid_loader]['dataset'])
+    train_loader = DataLoader(train_dataset, **loader_conf[args.train_loader]['args'])
+    valid_loader = DataLoader(valid_dataset, **loader_conf[args.valid_loader]['args'])
 
     # create trainer and valider
     runner_conf = conf['runner']
@@ -191,9 +192,10 @@ def start_evaluate(args: Namespace, conf: Dict[str, Dict|Any]):
     ckpt_manager.load_model(model, ckpt_path=args.load)
 
     # prepare dataset and dataloader
-    data_conf = conf['data']
-    valid_dataset = get_dataset(data_conf['valid_loader']['dataset'], 'valid')
-    valid_loader = DataLoader(valid_dataset, **data_conf['valid_loader']['args'])
+    loader_conf = conf['data']['dataloaders']
+    show(f"[INFO] Using {loader_conf[args.valid_loader]['dataset']} as valid dataset.")
+    valid_dataset = get_dataset(conf['data']['datasets'], loader_conf[args.valid_loader]['dataset'])
+    valid_loader = DataLoader(valid_dataset, **loader_conf[args.valid_loader]['args'])
 
     # create valider
     runner_conf = conf['runner']
@@ -219,6 +221,8 @@ def main():
     parser.add_argument('-m', '--mode', type=str, choices=['train', 'evaluate'], required=True, help='mode of this training')
     parser.add_argument('-c', '--config', type=str, default='configs/template.yaml', help='path to config file')
     parser.add_argument('-s', '--seed', type=int, default=0, help='random seed')
+    parser.add_argument('--train_loader', type=str, default='train_loader', help='train loader name')
+    parser.add_argument('--valid_loader', type=str, default='valid_loader', help='valid loader name')
     parser.add_argument('--load', default=None, help='path to checkpoint file')
     parser.add_argument('--device', type=str, default='cuda:0', help='device to use')
     parser.add_argument('--slient', action='store_true', help='slient or not')

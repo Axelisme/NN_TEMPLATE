@@ -45,35 +45,49 @@ architectures: &Arch
 
 
 data:
-  train_loader:
-    args:
-      batch_size: 32
-      shuffle: True
-      pin_memory: True
-      num_workers: 0
-    dataset:
-      select: 'HDF5DataSet'
-      HDF5DataSet:
-        module: 'custom.dataset.hdf5_dataset'
-        args:
-          dataset_path: './data/processed/template/train.h5'
+  datasets:
+    train_hdf5_template:
+      name: 'HDF5DataSet'
+      module: 'custom.dataset.hdf5_dataset'
+      args:
+        dataset_path: './data/processed/template/train.h5'
+    valid_hdf5_template:
+      name: 'HDF5DataSet'
+      module: 'custom.dataset.hdf5_dataset'
+      args:
+        dataset_path: './data/processed/template/valid.h5'
+    test_hdf5_template:
+      name: 'HDF5DataSet'
+      module: 'custom.dataset.hdf5_dataset'
+      args:
+        dataset_path: './data/processed/template/test.h5'
 
-  valid_loader:
-    args:
-      batch_size: 1
-      shuffle: False
-      pin_memory: True
-      num_workers: 0
-    dataset:
-      select: 'HDF5DataSet'
-      HDF5DataSet:
-        module: 'custom.dataset.hdf5_dataset'
-        args:
-          dataset_path: './data/processed/template/valid.h5'
+  dataloaders:
+    train_loader:
+      args:
+        batch_size: 32
+        shuffle: True
+        pin_memory: True
+        num_workers: 0
+      dataset: 'train_hdf5_template'
+    valid_loader:
+      args:
+        batch_size: 1
+        shuffle: False
+        pin_memory: True
+        num_workers: 0
+      dataset: 'valid_hdf5_template'
+    test_loader:
+      args:
+        batch_size: 1
+        shuffle: False
+        pin_memory: True
+        num_workers: 0
+      dataset: 'test_hdf5_template'
 
 
 runner:
-  step_mod: 'grad'
+  step_mod: 'grad' # 'epoch' or 'grad'
   total_steps: 1100
   log_freq: 100
   dev_freq: 1000
