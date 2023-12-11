@@ -149,13 +149,15 @@ WandB:
                             - 0.0005
         data:
           parameters:
-            train_loader:
+            dataloaders:
               parameters:
-                args:
+                train_loader:
                   parameters:
-                    batch_size:
-                      values:
-                        - 16
-                        - 32
-                        - 64
+                    args:
+                      parameters:
+                        batch_size:
+                          values:
+                            - 16
+                            - 32
+                            - 64
 
