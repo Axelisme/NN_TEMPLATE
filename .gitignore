@@ -6,6 +6,8 @@ test.ipynb
 data
 !data/**/.gitkeep
 
+results
+
 __pycache__/
 *.pyc
 

@@ -1,0 +1,46 @@
+project: 'Template_project'
+num_trials: 3
+config:
+  name: 'Template_sweep'
+  method: 'random'
+  metric:
+    name: 'Valid_loss'
+    goal: 'minimize'
+  parameters:
+    conf:
+      parameters:
+        runner:
+          parameters:
+            total_steps:
+              value: 100
+            log_freq:
+              value: 50
+            dev_freq:
+              value: 50
+
+        architectures:
+          parameters:
+            optimizer:
+              parameters:
+                AdamW:
+                  parameters:
+                    kwargs:
+                      parameters:
+                        lr:
+                          values:
+                            - 0.0001
+                            - 0.0003
+                            - 0.0005
+        data:
+          parameters:
+            dataloaders:
+              parameters:
+                train_loader:
+                  parameters:
+                    kwargs:
+                      parameters:
+                        batch_size:
+                          values:
+                            - 16
+                            - 32
+                            - 64

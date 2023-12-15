@@ -1,7 +1,6 @@
 
 """define a class for training a model"""
 
-import weakref
 from typing import Dict
 from tqdm import tqdm
 from argparse import Namespace
@@ -43,7 +42,6 @@ class Trainer:
         self.device = torch.device(args.device)
 
         self.train_bar = tqdm(total=len(train_loader), desc='Train', dynamic_ncols=True, disable=args.slient)
-        self.__train_bar_finalizer = weakref.finalize(self.train_bar, self.train_bar.close)
 
         self.cycle_loader = cycle_iter(train_loader, callback=self.train_bar.reset)
 
@@ -57,6 +55,10 @@ class Trainer:
         self.train_metrics.to(self.device)
 
         self.train_metrics.reset()
+
+    def close(self):
+        '''close the trainer'''
+        self.train_bar.close()
 
 
     @property

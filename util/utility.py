@@ -3,6 +3,7 @@
 
 import random
 import numpy as np
+import importlib
 
 import torch
 from torch.backends import cudnn
@@ -51,3 +52,9 @@ def check_better(conf, current_result, best_result):
         else:
             continue
     return False
+
+
+def create_instance(select_conf, *args, **kwargs):
+    """create instance of class"""
+    module = importlib.import_module(select_conf['module'])
+    return getattr(module, select_conf['name'])(*args, **kwargs, **select_conf['kwargs'])

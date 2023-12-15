@@ -39,6 +39,10 @@ class Valider:
 
         self.valid_metrics.reset()
 
+    def close(self):
+        '''close the valider'''
+        pass
+
 
     def set_eval(self):
         '''set model and criterion to eval mode'''

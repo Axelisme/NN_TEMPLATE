@@ -2,8 +2,9 @@ architectures: &Arch
   model:
     select: 'TemplateModel'
     TemplateModel:
+      name: 'TemplateModel'
       module: 'custom.model.template'
-      args:
+      kwargs:
         input_size: 128
         num_classes: &N 8
         hidden_size: 256
@@ -11,35 +12,39 @@ architectures: &Arch
   optimizer:
     select: 'AdamW'
     AdamW: &AdamW_args
+      name: 'AdamW'
       module: 'torch.optim'
-      args:
+      kwargs:
         lr: 0.0003
-    Adam: *AdamW_args
 
   scheduler:
     select: 'ExponentialLR'
     ExponentialLR:
+      name: 'ExponentialLR'
       module: 'torch.optim.lr_scheduler'
-      args:
+      kwargs:
         gamma: 0.9995
     ConstantLR:
+      name: 'ConstantLR'
       module: 'torch.optim.lr_scheduler'
-      args:
+      kwargs:
         total_iters: 0
 
   loss:
     select: 'CrossEntropyLoss'
     CrossEntropyLoss:
+      name: 'CrossEntropyLoss'
       module: 'torch.nn'
-      args: {}
+      kwargs: {}
 
   metric:
     select:
       - 'MulticlassAccuracy'
     use_loss: True
     MulticlassAccuracy:
+      name: 'MulticlassAccuracy'
       module: 'torchmetrics.classification'
-      args:
+      kwargs:
         num_classes: *N
         average: 'macro'
 
@@ -49,36 +54,36 @@ data:
     train_hdf5_template:
       name: 'HDF5DataSet'
       module: 'custom.dataset.hdf5_dataset'
-      args:
+      kwargs:
         dataset_path: './data/processed/template/train.h5'
     valid_hdf5_template:
       name: 'HDF5DataSet'
       module: 'custom.dataset.hdf5_dataset'
-      args:
+      kwargs:
         dataset_path: './data/processed/template/valid.h5'
     test_hdf5_template:
       name: 'HDF5DataSet'
       module: 'custom.dataset.hdf5_dataset'
-      args:
+      kwargs:
         dataset_path: './data/processed/template/test.h5'
 
   dataloaders:
     train_loader:
-      args:
+      kwargs:
         batch_size: 32
         shuffle: True
         pin_memory: True
         num_workers: 0
       dataset: 'train_hdf5_template'
     valid_loader:
-      args:
+      kwargs:
         batch_size: 1
         shuffle: False
         pin_memory: True
         num_workers: 0
       dataset: 'valid_hdf5_template'
     test_loader:
-      args:
+      kwargs:
         batch_size: 1
         shuffle: False
         pin_memory: True
@@ -92,72 +97,24 @@ runner:
   log_freq: 100
   dev_freq: 1000
   save_freq: 500
-  trainer_args:
+  trainer_kwargs:
     gradient_accumulation_steps: 1
-  valider_args: {}
+  valider_kwargs: {}
 
 
 ckpt:
   save_mod : 'max'
   check_metrics:
     - 'MulticlassAccuracy'
-  ckpt_dir: ~  # default: './data/saved_models/{name}'
+  ckpt_dir: ~  # default: './results/{name}'
   keep_num: 3
 
 
 WandB:
   project: &P 'Template_project'
-  init_args:
-    name: 'Template_model'
+  init_kwargs:
     config: *Arch
-  watch_args:
+  watch_kwargs:
     log: 'all'
     log_freq: 1000
-  sweep:
-    num_trials: 30
-    config:
-      name: 'Template_sweep'
-      method: 'random'
-      metric:
-        name: 'Valid_loss'
-        goal: 'minimize'
-      parameters:
-        runner:
-          parameters:
-            total_steps:
-              value: 100
-            log_freq:
-              value: 50
-            dev_freq:
-              value: 50
-        architectures:
-          parameters:
-            optimizer:
-              parameters:
-                select:
-                  values:
-                    - 'AdamW'
-                    - 'Adam'
-                AdamW:
-                  parameters:
-                    args:
-                      parameters:
-                        lr:
-                          values:
-                            - 0.0001
-                            - 0.0003
-                            - 0.0005
-        data:
-          parameters:
-            dataloaders:
-              parameters:
-                train_loader:
-                  parameters:
-                    args:
-                      parameters:
-                        batch_size:
-                          values:
-                            - 16
-                            - 32
-                            - 64
 
