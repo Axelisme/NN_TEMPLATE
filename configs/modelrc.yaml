@@ -1,0 +1,8 @@
+select: 'TemplateModel'
+TemplateModel:
+  name: 'TemplateModel'
+  module: 'custom.model.template'
+  kwargs:
+    input_size: 128
+    num_classes: 8
+    hidden_size: 256

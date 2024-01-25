@@ -15,7 +15,7 @@ from util.datatools import apply_to_all_files, load_dir_as_label, split_list
 # define the data parameters
 split_ratio = {
     "train": 0.8,
-    "valid": 0.1,
+    "devel": 0.1,
     "test" : 0.1
 }
 postfix = ".jpg"

@@ -1,14 +1,4 @@
-architectures: &Arch
-  model:
-    select: 'TemplateModel'
-    TemplateModel:
-      name: 'TemplateModel'
-      module: 'custom.model.template'
-      kwargs:
-        input_size: 128
-        num_classes: &N 8
-        hidden_size: 256
-
+arch: &Arch
   optimizer:
     select: 'AdamW'
     AdamW: &AdamW_args
@@ -41,11 +31,12 @@ architectures: &Arch
     select:
       - 'MulticlassAccuracy'
     use_loss: True
+    loss_name: 'valid_loss'
     MulticlassAccuracy:
       name: 'MulticlassAccuracy'
       module: 'torchmetrics.classification'
       kwargs:
-        num_classes: *N
+        num_classes: 8
         average: 'macro'
 
 
@@ -56,11 +47,11 @@ data:
       module: 'custom.dataset.hdf5_dataset'
       kwargs:
         dataset_path: './data/processed/template/train.h5'
-    valid_hdf5_template:
+    devel_hdf5_template:
       name: 'HDF5DataSet'
       module: 'custom.dataset.hdf5_dataset'
       kwargs:
-        dataset_path: './data/processed/template/valid.h5'
+        dataset_path: './data/processed/template/devel.h5'
     test_hdf5_template:
       name: 'HDF5DataSet'
       module: 'custom.dataset.hdf5_dataset'
@@ -75,13 +66,13 @@ data:
         pin_memory: True
         num_workers: 0
       dataset: 'train_hdf5_template'
-    valid_loader:
+    devel_loader:
       kwargs:
         batch_size: 1
         shuffle: False
         pin_memory: True
         num_workers: 0
-      dataset: 'valid_hdf5_template'
+      dataset: 'devel_hdf5_template'
     test_loader:
       kwargs:
         batch_size: 1
@@ -91,29 +82,32 @@ data:
       dataset: 'test_hdf5_template'
 
 
-runner:
+runner: &Runner
   step_mod: 'grad' # 'epoch' or 'grad'
   total_steps: 1100
   log_freq: 100
-  dev_freq: 1000
+  valid_freq: 1000
   save_freq: 500
+  seed: 0
   trainer_kwargs:
-    gradient_accumulation_steps: 1
+    grad_acc_steps: 1
   valider_kwargs: {}
 
 
 ckpt:
-  save_mod : 'max'
   check_metrics:
-    - 'MulticlassAccuracy'
-  ckpt_dir: ~  # default: './results/{name}'
+    - {name: 'MulticlassAccuracy', mod: 'max'}
+    - {name: 'valid_loss', mod: 'min'}
   keep_num: 3
 
 
 WandB:
   project: &P 'Template_project'
+  track_params: True
   init_kwargs:
-    config: *Arch
+    config:
+      arch: *Arch
+      runner: *Runner
   watch_kwargs:
     log: 'all'
     log_freq: 1000

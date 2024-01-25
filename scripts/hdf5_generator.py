@@ -12,7 +12,7 @@ from util.datatools import generate_hdf5_data, sampling_hdf5_data
 dataset_name = "template"
 split_ratio = {
     "train": 0.8,
-    "valid": 0.1,
+    "devel": 0.1,
     "test" : 0.1
 }
 data_dtype = np.dtype([("input", np.float32, (128,)), ("label", np.uint8)])

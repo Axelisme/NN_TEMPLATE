@@ -4,82 +4,69 @@ optimize hyperparameters for the model using Weights and Biases
 import yaml
 import wandb
 import argparse
-from copy import deepcopy
 from functools import partial
-from typing import Dict
+from argparse import Namespace
 
-from scripts.run import start_train
+from modules.runner import Runner
 from util.utility import init
-from util.io import show
 
 
-def override_conf(conf, new_conf):
-    for key, value in new_conf.items():
-        if isinstance(value, dict):
-            if key not in conf:
-                print(f"something wrong with {key}")
-                raise ValueError
-            override_conf(conf[key], value)
-        else:
-            print(f'override {key} from {conf[key]} to {value}')
-            conf[key] = value
-
-
-def train_for_sweep(default_setup:Dict):
+def train_for_sweep(args: Namespace):
     wandb.init()
 
-    setup = deepcopy(default_setup)
-    override_conf(setup, wandb.config)
+    # fork is needed for sweep
+    overwrite_conf = wandb.config
 
-    args = argparse.Namespace(**setup['args'])
-    conf = setup['conf']
+    if 'taskrc' not in overwrite_conf:
+        overwrite_conf['taskrc'] = {}
+    if 'WandB' not in overwrite_conf['taskrc']:
+        overwrite_conf['taskrc']['WandB'] = {}
+    overwrite_conf['taskrc']['WandB']['track_params'] = False # must be False
+    overwrite_conf['taskrc']['WandB']['init_kwargs'] = {}
 
-    show.set_slient(args.slient)
-
-    init(seed=args.seed, start_method='fork')
-    start_train(args, conf)
+    runner = Runner(args, overwrite_conf, start_method='fork')
+    runner.run()
 
 
-def get_default_setup(conf_path:str):
-    # load config
-    with open(conf_path, 'r') as f:
-        default_conf = yaml.load(f, Loader=yaml.Loader)
-
+def get_default_args(modelrc: str, taskrc: str) -> Namespace:
     # default args
     default_args = {
-        'name': 'sweep',
-        'mode': 'train',
-        'seed': 0,
-        'train_loader': 'train_loader',
-        'valid_loader': 'valid_loader',
-        'load': None,
-        'device': 'cuda:0',
-        'slient': False,
-        'WandB': True,
-        'not_track_params': True,
-        'disable_save': True,
-        'overwrite': False
+        'mode' : 'train',
+        'ckpt' : None,
+        'name' : 'sweep_run',
+        'modelrc' : modelrc,
+        'taskrc' : taskrc,
+        'resume' : False,
+        'ckpt_dir' : None,
+        'train_loader' : 'train_loader',
+        'valid_loader' : 'devel_loader',
+        'device' : 'cuda:0',
+        'slient' : False,
+        'WandB' : True,
+        'disable_save' : True,
+        'overwrite' : False
     }
 
-    return {'args': default_args, 'conf': default_conf}
+    default_args = Namespace(**default_args)
+
+    return default_args
 
 
 def main():
     # parse arguments
     parser = argparse.ArgumentParser(description='Training model.')
-    parser.add_argument('-c', '--default_config', type=str, default='configs/template.yaml', help='path to train config file')
-    parser.add_argument('-s', '--sweep_config', type=str, default='configs/sweep.yaml', help='path to sweep config file')
+    parser.add_argument('-M', '--modelrc', type=str, help='modelrc file, use to train a new model, default to configs/modelrc.yaml')
+    parser.add_argument('-T', '--taskrc', type=str, help='taskrc file, default to configs/taskrc.yaml')
+    parser.add_argument('-s', '--sweeprc', type=str, default='configs/sweeprc.yaml', help='path to sweep config file')
     args = parser.parse_args()
 
-    with open(args.sweep_config, 'r') as f:
-        sweep_conf = yaml.load(f, Loader=yaml.Loader)
+    with open(args.sweeprc, 'r') as f:
+        sweeprc = yaml.load(f, Loader=yaml.FullLoader)
 
-    default_setup = get_default_setup(args.default_config)
+    train_fn = partial(train_for_sweep, args = get_default_args(args.modelrc, args.taskrc))
 
-    train_fn = partial(train_for_sweep, default_setup=default_setup)
-
-    sweep_id = wandb.sweep(sweep_conf['config'], project=sweep_conf['project'])
-    wandb.agent(sweep_id, function=train_fn, count=sweep_conf['num_trials'])
+    sweep_id = wandb.sweep(sweeprc['config'], project=sweeprc['project'])
+    wandb.agent(sweep_id, function=train_fn, count=sweeprc['num_trials'])
 
 
 if __name__ == '__main__':

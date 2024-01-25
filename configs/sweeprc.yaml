@@ -4,10 +4,21 @@ config:
   name: 'Template_sweep'
   method: 'random'
   metric:
-    name: 'Valid_loss'
+    name: 'valid_loss'
     goal: 'minimize'
   parameters:
-    conf:
+    modelrc:
+      parameters:
+        TemplateModel:
+          parameters:
+            kwargs:
+              parameters:
+                hidden_size:
+                  values:
+                    - 128
+                    - 256
+                    - 512
+    taskrc:
       parameters:
         runner:
           parameters:
@@ -15,10 +26,10 @@ config:
               value: 100
             log_freq:
               value: 50
-            dev_freq:
+            valid_freq:
               value: 50
 
-        architectures:
+        arch:
           parameters:
             optimizer:
               parameters:

@@ -2,7 +2,7 @@
 """define a class for valid a model"""
 
 from typing import Dict
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from argparse import Namespace
 
 
@@ -20,33 +20,28 @@ class Valider:
                  model: nn.Module,
                  valid_loader: DataLoader,
                  metrics: MetricCollection,
-                 args: Namespace,
+                 device: str,
+                 slient: bool,
                  **kwargs):
         self.model = model
         self.valid_loader = valid_loader
         self.valid_metrics = metrics
-        self.args = args
 
-        self.device = torch.device(args.device)
-
-        self.init()
-
-
-    def init(self):
-        '''initial the model and criterion'''
-        self.model.to(self.device)
-        self.valid_metrics.to(self.device)
+        self.device = torch.device(device)
+        self.slient = slient
 
         self.valid_metrics.reset()
 
     def close(self):
         '''close the valider'''
-        pass
+        self.valid_metrics.reset()
 
 
     def set_eval(self):
         '''set model and criterion to eval mode'''
         self.model.eval()
+        self.model.to(self.device)
+        self.valid_metrics.to(self.device)
 
 
     def pop_result(self) -> Dict[str, Tensor]:
@@ -60,7 +55,7 @@ class Valider:
         old_seed = set_seed(0)
         self.set_eval()
         with torch.no_grad():
-            for input, *other in tqdm(self.valid_loader, desc='Valid ', dynamic_ncols=True, disable=self.args.slient):
+            for input, *other in tqdm(self.valid_loader, desc='Valid ', dynamic_ncols=True, disable=self.slient):
                 # move input to device
                 input = input.to(self.device)
 

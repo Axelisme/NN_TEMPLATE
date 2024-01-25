@@ -24,7 +24,8 @@ class Trainer:
                  optimizer: Optimizer,
                  scheduler: _LRScheduler,
                  criterion: nn.Module,
-                 args: Namespace,
+                 device: str,
+                 slient: bool,
                  grad_acc_steps:int = 1,
                  **kwargs):
         self.model = model
@@ -32,33 +33,24 @@ class Trainer:
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.criterion = criterion
-        self.args = args
 
         self.grad_acc_steps = grad_acc_steps
 
         self.train_metrics = MetricCollection({
             'train_loss': MeanMetric(),
         })
-        self.device = torch.device(args.device)
+        self.device = torch.device(device)
 
-        self.train_bar = tqdm(total=len(train_loader), desc='Train', dynamic_ncols=True, disable=args.slient)
+        self.train_bar = tqdm(total=len(train_loader), desc='Train', dynamic_ncols=True, disable=slient)
 
         self.cycle_loader = cycle_iter(train_loader, callback=self.train_bar.reset)
-
-        self.init()
-
-
-    def init(self):
-        '''initial the model and criterion'''
-        self.model.to(self.device)
-        self.criterion.to(self.device)
-        self.train_metrics.to(self.device)
 
         self.train_metrics.reset()
 
     def close(self):
         '''close the trainer'''
         self.train_bar.close()
+        self.train_metrics.reset()
 
 
     @property
@@ -72,6 +64,9 @@ class Trainer:
         # initial model and criterion
         self.model.train()
         self.criterion.train()
+        self.model.to(self.device)
+        self.criterion.to(self.device)
+        self.train_metrics.to(self.device)
 
 
     def pop_result(self) -> Dict[str, Tensor]:

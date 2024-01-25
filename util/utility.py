@@ -32,28 +32,6 @@ def init(seed : int, start_method:str = 'forkserver') -> None:
     cudnn.benchmark = True
 
 
-def get_cuda() -> torch.device:
-    if torch.cuda.is_available():
-        return torch.device('cuda')
-    else:
-        raise RuntimeError('No cuda device available.')
-
-
-def check_better(conf, current_result, best_result):
-    for name in conf['check_metrics']:
-        if current_metric := current_result.get(name):
-            if best_metric := best_result.get(name):
-                if current_metric == best_metric:
-                    continue
-                return conf['save_mod'] == 'max' and current_metric > best_metric or \
-                        conf['save_mod'] == 'min' and current_metric < best_metric
-            else:
-                return True
-        else:
-            continue
-    return False
-
-
 def create_instance(select_conf, *args, **kwargs):
     """create instance of class"""
     module = importlib.import_module(select_conf['module'])
