@@ -12,7 +12,7 @@ from functools import partial
 from argparse import Namespace
 
 from modules.runner import Runner
-from util.utility import init
+from global_vars import RESULT_DIR
 
 
 def train_for_sweep(args: Namespace):
@@ -29,7 +29,7 @@ def train_for_sweep(args: Namespace):
     overwrite_conf['taskrc']['WandB']['init_kwargs'] = {}
 
     runner = Runner(args, overwrite_conf, start_method='fork')
-    runner.run()
+    runner.train()
 
 
 def get_default_args(modelrc: str, taskrc: str) -> Namespace:
@@ -37,18 +37,17 @@ def get_default_args(modelrc: str, taskrc: str) -> Namespace:
     default_args = {
         'mode' : 'train',
         'ckpt' : None,
+        'taskrc' : taskrc,
+        'device' : 'cuda:0',
+        'silent' : False,
         'name' : 'sweep_run',
         'modelrc' : modelrc,
-        'taskrc' : taskrc,
         'resume' : False,
-        'ckpt_dir' : None,
-        'train_loader' : 'train_loader',
-        'valid_loader' : 'devel_loader',
-        'device' : 'cuda:0',
-        'slient' : False,
+        'ckpt_dir' : os.path.join(RESULT_DIR, 'sweep_run'),
         'WandB' : True,
         'disable_save' : True,
-        'overwrite' : False
+        'overwrite' : False,
+        'valid_loaders' : None
     }
 
     default_args = Namespace(**default_args)
@@ -59,8 +58,8 @@ def get_default_args(modelrc: str, taskrc: str) -> Namespace:
 def main():
     # parse arguments
     parser = argparse.ArgumentParser(description='Training model.')
-    parser.add_argument('-M', '--modelrc', type=str, help='modelrc file, use to train a new model, default to configs/modelrc.yaml')
-    parser.add_argument('-T', '--taskrc', type=str, help='taskrc file, default to configs/taskrc.yaml')
+    parser.add_argument('-M', '--modelrc', type=str, help='modelrc file, use to train a new model')
+    parser.add_argument('-T', '--taskrc', type=str, help='taskrc file')
     parser.add_argument('-s', '--sweeprc', type=str, default='configs/sweeprc.yaml', help='path to sweep config file')
     args = parser.parse_args()
 

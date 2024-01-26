@@ -46,7 +46,7 @@ config:
           parameters:
             dataloaders:
               parameters:
-                train_loader:
+                train:
                   parameters:
                     kwargs:
                       parameters:

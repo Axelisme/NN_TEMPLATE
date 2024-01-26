@@ -1,7 +1,7 @@
 
 """define a class for training a model"""
 
-from typing import Dict
+from typing import Dict, Optional
 from tqdm import tqdm
 from argparse import Namespace
 
@@ -26,7 +26,8 @@ class Trainer:
             scheduler: _LRScheduler,
             criterion: nn.Module,
             device: str,
-            silent: bool,
+            metrics: Optional[MetricCollection],
+            silent: bool = False,
             grad_acc_steps:int = 1,
         ):
         self.model = model
@@ -37,22 +38,24 @@ class Trainer:
 
         self.grad_acc_steps = grad_acc_steps
 
-        self.train_metrics = MetricCollection({
-            'train_loss': MeanMetric(),
-        })
+        self.loss_metrics = MeanMetric()
+        self.metrics = metrics
         self.device = torch.device(device)
 
         self.train_bar = tqdm(total=len(train_loader), desc='Train', dynamic_ncols=True, disable=silent)
 
         self.cycle_loader = cycle_iter(train_loader, callback=self.train_bar.reset)
 
-        self.train_metrics.reset()
+        if self.metrics is not None:
+            self.metrics.reset()
 
 
     def close(self):
         '''close the trainer'''
         self.train_bar.close()
-        self.train_metrics.reset()
+        self.loss_metrics.reset()
+        if self.metrics is not None:
+            self.metrics.reset()
 
 
     @property
@@ -68,14 +71,20 @@ class Trainer:
         self.criterion.train()
         self.model.to(self.device)
         self.criterion.to(self.device)
-        self.train_metrics.to(self.device)
+        self.loss_metrics.to(self.device)
+        if self.metrics is not None:
+            self.metrics.to(self.device)
 
 
     def pop_result(self) -> Dict[str, Tensor]:
         '''get the average loss of training and reset the statistic of loss'''
-        loss = self.train_metrics.compute()
-        self.train_metrics.reset()
-        return loss
+        results = {}
+        if self.metrics is not None:
+            results.update(self.metrics.compute())
+            self.metrics.reset()
+        results.update({'train_loss': self.loss_metrics.compute()})
+        self.loss_metrics.reset()
+        return results
 
 
     def one_step(self):
@@ -90,10 +99,16 @@ class Trainer:
             # compute loss and record
             other = [item.to(self.device) for item in other if isinstance(item, Tensor)]
             loss:Tensor = self.criterion(output, *other)
-            self.train_metrics.update(loss)
+            self.loss_metrics.update(loss)
 
             # backward
             (loss / self.grad_acc_steps).backward()
+            del loss
+
+            # compute metrics if have
+            if self.metrics is not None:
+                self.metrics.update(output, *other)
+            del output, other
 
             # update parameters
             if steps >= self.grad_acc_steps:
@@ -117,8 +132,13 @@ class Trainer:
             # compute loss and record
             other = [item.to(self.device) for item in other if isinstance(item, Tensor)]
             loss:Tensor = self.criterion(output, *other)
-            self.train_metrics.update(loss)
-            del output, input, other
+            self.loss_metrics.update(loss)
+            del input
+
+            # compute metrics if have
+            if self.metrics is not None:
+                self.metrics.update(output, *other)
+            del output, other
 
             # backward
             (loss / self.grad_acc_steps).backward()

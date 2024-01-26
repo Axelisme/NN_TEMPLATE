@@ -1,19 +1,14 @@
 arch: &Arch
   optimizer:
     select: 'AdamW'
-    AdamW: &AdamW_args
+    AdamW:
       name: 'AdamW'
       module: 'torch.optim'
       kwargs:
         lr: 0.0003
 
   scheduler:
-    select: 'ExponentialLR'
-    ExponentialLR:
-      name: 'ExponentialLR'
-      module: 'torch.optim.lr_scheduler'
-      kwargs:
-        gamma: 0.9995
+    select: 'ConstantLR'
     ConstantLR:
       name: 'ConstantLR'
       module: 'torch.optim.lr_scheduler'
@@ -21,18 +16,19 @@ arch: &Arch
         total_iters: 0
 
   loss:
-    select: 'CrossEntropyLoss'
-    CrossEntropyLoss:
+    select: 'CELoss'
+    CELoss:
       name: 'CrossEntropyLoss'
       module: 'torch.nn'
       kwargs: {}
 
   metric:
-    select:
-      - 'Acc'
     use_loss: True
-    loss_name:  &Loss_name 'Valid_loss'
-    Acc:
+    loss_name:  &Loss_name 'val_loss'
+    apply_on_train: True
+    select:
+      - &Acc 'acc'
+    acc:
       name: 'MulticlassAccuracy'
       module: 'torchmetrics.classification'
       kwargs:
@@ -100,7 +96,7 @@ runner: &Runner
 
 ckpt:
   check_metrics:
-    - {name: 'Acc', mod: 'max'}
+    - {name: *Acc, mod: 'max'}
     - {name: *Loss_name, mod: 'min'}
   keep_num: 3
 

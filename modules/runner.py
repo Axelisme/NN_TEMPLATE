@@ -41,7 +41,7 @@ class Runner:
         if args.ckpt:  # provide ckpt
             self.modelrc = CheckPointManager.load_config(args.ckpt, 'modelrc')
         else:  # load modelrc from file
-            show(f'[RUNNER] Load modelrc from {args.modelrc}.')
+            show(f'[Runner] Load modelrc from {args.modelrc}.')
             with open(args.modelrc, 'r') as f:
                 self.modelrc = yaml.load(f, Loader=yaml.FullLoader)
 
@@ -49,7 +49,7 @@ class Runner:
         if args.taskrc is None:
             self.taskrc = CheckPointManager.load_config(args.ckpt, 'taskrc')
         else:
-            show(f'[RUNNER] Load taskrc from {args.taskrc}.')
+            show(f'[Runner] Load taskrc from {args.taskrc}.')
             with open(args.taskrc, 'r') as f:
                 self.taskrc = yaml.load(f, Loader=yaml.FullLoader)
 
@@ -72,18 +72,18 @@ class Runner:
         # set random seed
         runner_conf = self.taskrc['runner']
         init(runner_conf['seed'], start_method=start_method)
-        show(f'[RUNNER] Random seed: {runner_conf["seed"]}.')
+        show(f'[Runner] Random seed: {runner_conf["seed"]}.')
 
 
     def _get_model(self):
         model_select = self.modelrc['select']
-        show(f"[RUNNER] Model: {model_select}.")
+        show(f"[Runner] Model: {model_select}.")
         return create_instance(self.modelrc[model_select])
 
 
     def _get_criterion(self):
         loss_select = self.taskrc['arch']['loss']['select']
-        show(f"[RUNNER] Loss function: {loss_select}.")
+        show(f"[Runner] Loss function: {loss_select}.")
         return create_instance(self.taskrc['arch']['loss'][loss_select])
 
 
@@ -92,12 +92,12 @@ class Runner:
 
         # select optimizer
         optim_select = arch_conf['optimizer']['select']
-        show(f"[RUNNER] Optimizer: {optim_select}.")
+        show(f"[Runner] Optimizer: {optim_select}.")
         optimizer = create_instance(arch_conf['optimizer'][optim_select], params=parameters)
 
         # select scheduler
         sched_select = arch_conf['scheduler']['select']
-        show(f"[RUNNER] Scheduler: {sched_select}.")
+        show(f"[Runner] Scheduler: {sched_select}.")
         scheduler = create_instance(arch_conf['scheduler'][sched_select], optimizer=optimizer)
 
         return optimizer, scheduler
@@ -110,20 +110,19 @@ class Runner:
         metrics = {}
         for name in arch_conf['metric']['select']:
             metrics[name] = create_instance(arch_conf['metric'][name])
-        if criterion is not None:
-            loss_name = arch_conf['metric']['loss_name']
-            assert loss_name not in metrics, f'Loss name {loss_name} has been used.'
-            metrics[loss_name] = LossScore(criterion)
+        loss_metric = LossScore(criterion) if criterion else None
 
         # show metrics
-        if len(metrics) >= 0:
-            show("[RUNNER] Metrics:")
+        if len(metrics) >= 0 or loss_metric:
+            show("[Runner] Metrics:")
             for i, name in enumerate(metrics.keys(), start=1):
                 show(f"\t{i}. {name}")
+            if loss_metric:
+                show(f"\t{len(metrics.keys())+1}. {arch_conf['metric']['loss_name']}")
         else:
-            show("[RUNNER] No metrics.")
+            show("[Runner] No metrics.")
 
-        return MetricCollection(metrics)
+        return metrics, loss_metric
 
     @staticmethod
     def _get_dataloader(datasets_conf:Dict, loader_conf:Dict, mode:str):
@@ -155,11 +154,11 @@ class Runner:
 
 
     def train(self):
-        show(f'[RUNNER] Mod: TRAIN')
+        show(f'[Runner] Mod: TRAIN')
 
         # initialize W&B
         if self.args.WandB:
-            show(f'[RUNNER] Initialize W&B to record training.')
+            show(f'[Runner] Initialize W&B to record training.')
             if self.args.resume:
                 wandb.init(project=self.taskrc['WandB']['project'], resume=True)
             else:
@@ -176,7 +175,7 @@ class Runner:
         model = self._get_model()
         criterion = self._get_criterion()
         optimizer, scheduler = self._get_modules_for_train(model.parameters())
-        metrics = self._get_modules_for_eval(criterion)
+        metrics, loss_metric = self._get_modules_for_eval(criterion)
 
         # load model from checkpoint if have
         if self.args.ckpt:
@@ -196,13 +195,14 @@ class Runner:
         loader_conf = self.taskrc['data']['dataloaders']
         if len(loader_conf['valid_selects']) != len(set(loader_conf['valid_selects'])):
             raise ValueError('Duplicate loaders in taskrc["data"]["loader"]["valid_selects"]')
-        show("[RUNNER] Train dataset:")
+        show("[Runner] Train dataset:")
         train_loader = self._get_dataloader(datasets_conf, loader_conf[loader_conf['train_select']], 'train')
-        show("[RUNNER] Valid dataset:")
+        show("[Runner] Valid dataset:")
         valid_loaders = [self._get_dataloader(datasets_conf, loader_conf[name], name) for name in loader_conf['valid_selects']]
 
         # create trainer and valider
         runner_conf = self.taskrc['runner']
+        metric_conf = self.taskrc['arch']['metric']
         trainer = Trainer(
             model=model,
             train_loader=train_loader,
@@ -210,12 +210,17 @@ class Runner:
             scheduler=scheduler,
             criterion=criterion,
             device=self.args.device,
+            metrics=MetricCollection(metrics) if metric_conf['apply_on_train'] else None,
             silent=self.args.silent,
             **runner_conf['trainer_kwargs']
         )
+        valider_metrics = metrics.copy()
+        if metric_conf['use_loss']:
+            assert metric_conf['loss_name'] not in metrics, f'Loss name {metric_conf["loss_name"]} is already used.'
+            valider_metrics[metric_conf['loss_name']] = loss_metric
         valider = Valider(
             model=model,
-            metrics=metrics,
+            metrics=MetricCollection(valider_metrics),
             device=self.args.device,
             silent=self.args.silent,
             **runner_conf['valider_kwargs']
@@ -233,15 +238,15 @@ class Runner:
             best_step = meta_conf['best_step']
             best_results = meta_conf['best_results']
             pbar.update(start_step)
-            show(f'[RUNNER] Resume training from step {start_step}.')
+            show(f'[Runner] Resume training from step {start_step}.')
             show('-' * 50)
-            show(f'[RUNNER] Last Best result:')
+            show(f'[Runner] Last Best result:')
             self._show_valid_results(best_step, best_results)
         else: # start from scratch
             start_step = 1
             best_step = 0
             best_results = {}
-            show(f'[RUNNER] Start training from scratch.')
+            show(f'[Runner] Start training from scratch.')
 
         # start training
         show('-' * 50)
@@ -267,7 +272,8 @@ class Runner:
                 self._show_train_result(step, trainer.lr, train_result)
                 print_slash = True
                 if self.args.WandB: # log train result to wandb
-                    wandb.log(train_result, step=step, commit=False)
+                    log_result = {f'train-{k}':v for k,v in train_result.items()}
+                    wandb.log(log_result, step=step, commit=False)
 
             # prepare for saving
             if not self.args.disable_save:
@@ -328,8 +334,8 @@ class Runner:
             if self.args.WandB:
                 wandb.log({'lr':trainer.lr}, step=step, commit=True)
 
-        show(f'[RUNNER] Training finished.')
-        show(f'[RUNNER] Best result:')
+        show(f'[Runner] Training finished.')
+        show(f'[Runner] Best result:')
         self._show_valid_results(best_step, best_results)
         show('-' * 50)
 
@@ -339,35 +345,36 @@ class Runner:
 
 
     def evaluate(self):
-        show(f'[RUNNER] Mod: EVALUATE')
+        show(f'[Runner] Mod: EVALUATE')
 
         # load models
         model = self._get_model()
         if self.taskrc['arch']['metric']['use_loss']:
-            metrics = self._get_modules_for_eval(self._get_criterion())
+            metrics, loss_metrics = self._get_modules_for_eval(self._get_criterion())
+            metrics[self.taskrc['arch']['metric']['loss_name']] = loss_metrics
         else:
-            metrics = self._get_modules_for_eval()
+            metrics, _ = self._get_modules_for_eval()
 
         # load model from checkpoint if have
         model.load_state_dict(CheckPointManager.load_param(self.args.ckpt, 'model'))
 
         # prepare dataset and dataloader
         loader_conf = self.taskrc['data']['dataloaders']
-        show("[RUNNER] Valid dataset:")
+        show("[Runner] Valid dataset:")
         valid_loaders = [self._get_dataloader(self.taskrc['data']['datasets'], loader_conf[name], name) for name in self.args.valid_loaders]
 
         # create valider
         runner_conf = self.taskrc['runner']
         valider = Valider(
             model=model,
-            metrics=metrics,
+            metrics=MetricCollection(metrics),
             device=self.args.device,
             silent=self.args.silent,
             **runner_conf['valider_kwargs']
         )
 
         # start validating
-        show("[RUNNER] Start evaluating.")
+        show("[Runner] Start evaluating.")
         show('-' * 50)
         current_results = {}
         for name, valid_loader in zip(self.args.valid_loaders, valid_loaders):
