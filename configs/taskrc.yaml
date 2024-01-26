@@ -29,10 +29,10 @@ arch: &Arch
 
   metric:
     select:
-      - 'MulticlassAccuracy'
+      - 'Acc'
     use_loss: True
-    loss_name: 'valid_loss'
-    MulticlassAccuracy:
+    loss_name:  &Loss_name 'Valid_loss'
+    Acc:
       name: 'MulticlassAccuracy'
       module: 'torchmetrics.classification'
       kwargs:
@@ -59,23 +59,25 @@ data:
         dataset_path: './data/processed/template/test.h5'
 
   dataloaders:
-    train_select: 'train_loader'
-    valid_select: 'devel_loader'
-    train_loader:
+    train_select: 'train'
+    valid_selects:
+      - 'devel'
+      - 'test'
+    train:
       kwargs:
         batch_size: 32
         shuffle: True
         pin_memory: True
         num_workers: 0
       dataset: 'train_hdf5_template'
-    devel_loader:
+    devel:
       kwargs:
         batch_size: 1
         shuffle: False
         pin_memory: True
         num_workers: 0
       dataset: 'devel_hdf5_template'
-    test_loader:
+    test:
       kwargs:
         batch_size: 1
         shuffle: False
@@ -98,8 +100,8 @@ runner: &Runner
 
 ckpt:
   check_metrics:
-    - {name: 'MulticlassAccuracy', mod: 'max'}
-    - {name: 'valid_loss', mod: 'min'}
+    - {name: 'Acc', mod: 'max'}
+    - {name: *Loss_name, mod: 'min'}
   keep_num: 3
 
 

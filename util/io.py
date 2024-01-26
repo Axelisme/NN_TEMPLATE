@@ -19,7 +19,7 @@ class PrintO(object):
             tqdm.write(*args, **kwargs)
 
 
-    def set_slient(self, slient:bool):
+    def set_silent(self, slient:bool):
         """set slient or not"""
         self.slient = slient
 

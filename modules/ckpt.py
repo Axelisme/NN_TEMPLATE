@@ -21,7 +21,7 @@ class CheckPointManager:
         if len(check_metrics) >= 0:
             show("[CheckpointManager] Save policy:")
             for i, metric in enumerate(check_metrics, start=1):
-                show(f"\t{i}. Name: {metric['name']:>20},\tMod: {metric['mod']}")
+                show(f"\t{i}. Name: {metric['name']:>10},\tMod: {metric['mod']}")
         else:
             show("[CheckpointManager] Save policy: ALAWYS NOT SAVE")
         self.check_metrics = check_metrics
@@ -35,20 +35,24 @@ class CheckPointManager:
         self.keep_num = keep_num
 
 
-    def check_better(self, current_result, best_result) -> bool:
-        for check_metric in self.check_metrics:
-            name = check_metric['name']
-            mod = check_metric['mod']
-            if current_metric := current_result.get(name):
-                if best_metric := best_result.get(name):
-                    if current_metric == best_metric:
+    def check_better(self, current_results: Dict[str, Dict[str, float]], best_results: Dict[str, Dict[str, float]]):
+        for check_key, current_result in current_results.items():
+            if best_result := best_results.get(check_key):
+                for check_metric in self.check_metrics:
+                    name = check_metric['name']
+                    mod = check_metric['mod']
+                    if current_metric := current_result.get(name):
+                        if best_metric := best_result.get(name):
+                            if current_metric == best_metric:
+                                continue
+                            return mod == 'max' and current_metric > best_metric or \
+                                    mod == 'min' and current_metric < best_metric
+                        else:
+                            return True
+                    else:
                         continue
-                    return mod == 'max' and current_metric > best_metric or \
-                            mod == 'min' and current_metric < best_metric
-                else:
-                    return True
             else:
-                continue
+                return True
         return False
 
     @classmethod

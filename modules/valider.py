@@ -16,21 +16,21 @@ from util.utility import set_seed
 
 
 class Valider:
-    def __init__(self,
-                 model: nn.Module,
-                 valid_loader: DataLoader,
-                 metrics: MetricCollection,
-                 device: str,
-                 slient: bool,
-                 **kwargs):
+    def __init__(
+            self,
+            model: nn.Module,
+            metrics: MetricCollection,
+            device: str,
+            silent: bool,
+        ):
         self.model = model
-        self.valid_loader = valid_loader
         self.valid_metrics = metrics
 
         self.device = torch.device(device)
-        self.slient = slient
+        self.silent = silent
 
         self.valid_metrics.reset()
+
 
     def close(self):
         '''close the valider'''
@@ -51,11 +51,11 @@ class Valider:
         return scores
 
 
-    def one_epoch(self):
+    def one_epoch(self, valid_loader: DataLoader, name: str):
         old_seed = set_seed(0)
         self.set_eval()
         with torch.no_grad():
-            for input, *other in tqdm(self.valid_loader, desc='Valid ', dynamic_ncols=True, disable=self.slient):
+            for input, *other in tqdm(valid_loader, desc=name.capitalize(), dynamic_ncols=True, disable=self.silent):
                 # move input to device
                 input = input.to(self.device)
 

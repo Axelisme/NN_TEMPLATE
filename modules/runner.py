@@ -34,8 +34,8 @@ class Runner:
     def __init__(self, args: Namespace, overwrite_rc: Dict = {}, start_method:str = 'forkserver'):
         self.args = args
 
-        # set slient or not
-        show.set_slient(args.slient)
+        # set silent or not
+        show.set_silent(args.silent)
 
         # load modelrc
         if args.ckpt:  # provide ckpt
@@ -128,7 +128,7 @@ class Runner:
     @staticmethod
     def _get_dataloader(datasets_conf:Dict, loader_conf:Dict, mode:str):
         dataset = loader_conf['dataset']
-        show(f"[RUNNER] {mode.capitalize()} dataset: {dataset}.")
+        show(f"\t{mode.capitalize()} dataset: {dataset}.")
         dataset = create_instance(datasets_conf[dataset])
         return DataLoader(dataset, **loader_conf['kwargs'])
 
@@ -143,13 +143,15 @@ class Runner:
             show(f'\t{name}: {evaluator:0.4f}')
 
 
-    def _show_valid_result(self, step: int, valid_result: Dict[str,float]):
+    def _show_valid_results(self, step: int, valid_results: Dict[str,Dict[str, float]]):
         """Print result of validation."""
         # print result
         show(f'Step: ({step} / {self.taskrc["runner"]["total_steps"]})')
         show("Valid result:")
-        for name, evaluator in valid_result.items():
-            show(f'\t{name}: {evaluator:0.4f}')
+        for name, valid_result in valid_results.items():
+            show(f'{name.capitalize()} :')
+            for name, evaluator in valid_result.items():
+                show(f'\t{name}: {evaluator:0.4f}')
 
 
     def train(self):
@@ -192,8 +194,12 @@ class Runner:
         # prepare dataset and dataloader
         datasets_conf = self.taskrc['data']['datasets']
         loader_conf = self.taskrc['data']['dataloaders']
+        if len(loader_conf['valid_selects']) != len(set(loader_conf['valid_selects'])):
+            raise ValueError('Duplicate loaders in taskrc["data"]["loader"]["valid_selects"]')
+        show("[RUNNER] Train dataset:")
         train_loader = self._get_dataloader(datasets_conf, loader_conf[loader_conf['train_select']], 'train')
-        valid_loader = self._get_dataloader(datasets_conf, loader_conf[loader_conf['valid_select']], 'valid')
+        show("[RUNNER] Valid dataset:")
+        valid_loaders = [self._get_dataloader(datasets_conf, loader_conf[name], name) for name in loader_conf['valid_selects']]
 
         # create trainer and valider
         runner_conf = self.taskrc['runner']
@@ -204,15 +210,14 @@ class Runner:
             scheduler=scheduler,
             criterion=criterion,
             device=self.args.device,
-            slient=self.args.slient,
+            silent=self.args.silent,
             **runner_conf['trainer_kwargs']
         )
         valider = Valider(
             model=model,
-            valid_loader=valid_loader,
             metrics=metrics,
             device=self.args.device,
-            slient=self.args.slient,
+            silent=self.args.silent,
             **runner_conf['valider_kwargs']
         )
 
@@ -221,21 +226,21 @@ class Runner:
             ckpt_manager = CheckPointManager(self.args.ckpt_dir, **self.taskrc['ckpt'])
 
         # setup progress bar and other things
-        pbar = tqdm(total=runner_conf['total_steps'], desc='Overall', dynamic_ncols=True, disable=self.args.slient)
+        pbar = tqdm(total=runner_conf['total_steps'], desc='Overall', dynamic_ncols=True, disable=self.args.silent)
         if self.args.resume: # resume from checkpoint
             meta_conf = CheckPointManager.load_config(self.args.ckpt, 'meta')
             start_step = meta_conf['step'] + 1
             best_step = meta_conf['best_step']
-            best_result = meta_conf['best_result']
+            best_results = meta_conf['best_results']
             pbar.update(start_step)
             show(f'[RUNNER] Resume training from step {start_step}.')
             show('-' * 50)
             show(f'[RUNNER] Last Best result:')
-            self._show_valid_result(best_step, best_result)
+            self._show_valid_results(best_step, best_results)
         else: # start from scratch
             start_step = 1
             best_step = 0
-            best_result = {}
+            best_results = {}
             show(f'[RUNNER] Start training from scratch.')
 
         # start training
@@ -252,12 +257,15 @@ class Runner:
             # update one step
             pbar.update()
 
+            # should print slash in the end of this step
+            print_slash = False
+
             # show result per log_freq steps
             if step % runner_conf['log_freq'] == 0 or step == runner_conf['total_steps']:
                 train_result = trainer.pop_result()
                 pbar.refresh() # refresh tqdm bar to show the latest result
                 self._show_train_result(step, trainer.lr, train_result)
-                show('-' * 50)
+                print_slash = True
                 if self.args.WandB: # log train result to wandb
                     wandb.log(train_result, step=step, commit=False)
 
@@ -271,36 +279,8 @@ class Runner:
                 save_confs = {
                     'modelrc': self.modelrc,
                     'taskrc': self.taskrc,
-                    'meta': {'step': step, 'best_step': best_step, 'best_result': best_result}
+                    'meta': {'step': step, 'best_step': best_step, 'best_results': best_results}
                 }
-
-            # should print slash in the end of this step
-            print_slash = False
-
-            # validate a epoch per dev_freq steps
-            if step % runner_conf['valid_freq'] == 0 or step == runner_conf['total_steps']:
-                valider.one_epoch()
-                current_result = valider.pop_result()
-
-                pbar.refresh() # refresh tqdm bar to show the latest result
-                self._show_valid_result(step, current_result)
-                print_slash = True
-
-                if self.args.WandB: # log valid result to wandb
-                    wandb.log(current_result, step=step, commit=False)
-
-                # save model if better
-                if not self.args.disable_save:
-                    if ckpt_manager.check_better(current_result, best_result):
-                        best_step = step
-                        best_result = current_result
-                        ckpt_manager.save_model(
-                            ckpt_name='valid-best.pth',
-                            params=save_params,
-                            confs=save_confs,
-                            overwrite=True
-                        )
-
 
             if step % runner_conf['save_freq'] == 0 and not self.args.disable_save:
                 ckpt_manager.save_model(
@@ -312,6 +292,35 @@ class Runner:
                 ckpt_manager.clean_old_ckpt('step-*.pth')
                 print_slash = True
 
+            # validate a epoch per dev_freq steps
+            if step % runner_conf['valid_freq'] == 0 or step == runner_conf['total_steps']:
+                if print_slash:
+                    show('-' * 50)
+                current_results = {}
+                for name, valid_loader in zip(loader_conf['valid_selects'], valid_loaders):
+                    valider.one_epoch(valid_loader, name)
+                    current_result = valider.pop_result()
+                    current_results[name] = current_result
+                    if self.args.WandB: # log valid result to wandb
+                        log_result = {f'{name}-{k}':v for k,v in current_result.items()}
+                        wandb.log(log_result, step=step, commit=False)
+
+                pbar.refresh() # refresh tqdm bar to show the latest result
+                self._show_valid_results(step, current_results)
+                print_slash = True
+
+                # save model if better
+                if not self.args.disable_save:
+                    if ckpt_manager.check_better(current_results, best_results):
+                        best_step = step
+                        best_results = current_results
+                        ckpt_manager.save_model(
+                            ckpt_name='valid-best.pth',
+                            params=save_params,
+                            confs=save_confs,
+                            overwrite=True
+                        )
+
             if print_slash:
                 show('-' * 50)
 
@@ -321,7 +330,7 @@ class Runner:
 
         show(f'[RUNNER] Training finished.')
         show(f'[RUNNER] Best result:')
-        self._show_valid_result(best_step, best_result)
+        self._show_valid_results(best_step, best_results)
         show('-' * 50)
 
         pbar.close()
@@ -344,26 +353,28 @@ class Runner:
 
         # prepare dataset and dataloader
         loader_conf = self.taskrc['data']['dataloaders']
-        valid_loader = self._get_dataloader(self.taskrc['data']['datasets'], loader_conf[self.args.valid_loader], 'valid')
+        show("[RUNNER] Valid dataset:")
+        valid_loaders = [self._get_dataloader(self.taskrc['data']['datasets'], loader_conf[name], name) for name in self.args.valid_loaders]
 
         # create valider
         runner_conf = self.taskrc['runner']
         valider = Valider(
             model=model,
-            valid_loader=valid_loader,
             metrics=metrics,
             device=self.args.device,
-            slient=self.args.slient,
+            silent=self.args.silent,
             **runner_conf['valider_kwargs']
         )
 
         # start validating
         show("[RUNNER] Start evaluating.")
         show('-' * 50)
-        valider.one_epoch()
-        current_result = valider.pop_result()
-
-        # show result
-        self._show_valid_result(0, current_result)
+        current_results = {}
+        for name, valid_loader in zip(self.args.valid_loaders, valid_loaders):
+            # validate a epoch
+            valider.one_epoch(valid_loader, name)
+            # show result
+            current_results[name] = valider.pop_result()
+        self._show_valid_results(0, current_results)
 
         valider.close()

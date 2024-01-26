@@ -18,16 +18,17 @@ from util.datatools import cycle_iter
 
 
 class Trainer:
-    def __init__(self,
-                 model: nn.Module,
-                 train_loader: DataLoader,
-                 optimizer: Optimizer,
-                 scheduler: _LRScheduler,
-                 criterion: nn.Module,
-                 device: str,
-                 slient: bool,
-                 grad_acc_steps:int = 1,
-                 **kwargs):
+    def __init__(
+            self,
+            model: nn.Module,
+            train_loader: DataLoader,
+            optimizer: Optimizer,
+            scheduler: _LRScheduler,
+            criterion: nn.Module,
+            device: str,
+            silent: bool,
+            grad_acc_steps:int = 1,
+        ):
         self.model = model
         self.train_loader = train_loader
         self.optimizer = optimizer
@@ -41,11 +42,12 @@ class Trainer:
         })
         self.device = torch.device(device)
 
-        self.train_bar = tqdm(total=len(train_loader), desc='Train', dynamic_ncols=True, disable=slient)
+        self.train_bar = tqdm(total=len(train_loader), desc='Train', dynamic_ncols=True, disable=silent)
 
         self.cycle_loader = cycle_iter(train_loader, callback=self.train_bar.reset)
 
         self.train_metrics.reset()
+
 
     def close(self):
         '''close the trainer'''
