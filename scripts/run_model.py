@@ -1,3 +1,7 @@
+import os
+import sys
+sys.path.append(os.getcwd())
+
 import argparse
 
 from modules.runner import Runner
@@ -51,6 +55,8 @@ def main():
                 parser.error('While loading existing ckpt but not resuming training, you must specify --taskrc')
             else:
                 args.taskrc = 'configs/taskrc.yaml'
+        if args.ckpt is None and args.name is None:
+            parser.error('While training a new model, you must specify --name')
     elif args.mode == 'evaluate':
         invalid_flags = ['name', 'modelrc', 'resume', 'ckpt_dir', 'train_loader', 'WandB', 'disable_save', 'overwrite']
         for flag in invalid_flags:

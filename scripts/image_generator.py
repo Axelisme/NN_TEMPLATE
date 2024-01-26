@@ -1,6 +1,9 @@
 
 """A script to generate data for the project."""
 import os
+import sys
+sys.path.append(os.getcwd())
+
 import csv
 import argparse
 

@@ -13,7 +13,7 @@ from util.utility import init, create_instance
 from modules.trainer import Trainer
 from modules.valider import Valider
 from modules.ckpt import CheckPointManager
-from custom.evaluator.Loss2evaluator import LossScore
+from modules.Loss2evaluator import LossScore
 from global_vars import RESULT_DIR
 
 

@@ -1,6 +1,9 @@
 
 """A script to generate data for the project."""
 import os
+import sys
+sys.path.append(os.getcwd())
+
 import numpy as np
 
 from global_vars import RAW_DATA_DIR, PROC_DATA_DIR

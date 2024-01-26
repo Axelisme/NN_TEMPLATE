@@ -1,6 +1,10 @@
 """
 optimize hyperparameters for the model using Weights and Biases
 """
+import os
+import sys
+sys.path.append(os.getcwd())
+
 import yaml
 import wandb
 import argparse
