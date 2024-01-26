@@ -14,7 +14,6 @@ from modules.trainer import Trainer
 from modules.valider import Valider
 from modules.ckpt import CheckPointManager
 from modules.Loss2evaluator import LossScore
-from global_vars import RESULT_DIR
 
 
 def recursive_overwrite(conf: Dict[str,Dict|Any], new_conf: Dict[str,Dict|Any]):
@@ -38,31 +37,17 @@ class Runner:
         # set slient or not
         show.set_slient(args.slient)
 
-        # check mode
-        assert args.mode in ['train', 'evaluate'], f'Unknown mode: {args.mode}'
-        show(f'[RUNNER] Initialize runner with mode: {args.mode}.')
-
-        # create checkpoint manager
-        if args.ckpt_dir is not None: # use specified ckpt_dir
-            ckpt_dir = args.ckpt_dir
-        elif args.ckpt is not None:   # use ckpt_dir of ckpt
-            ckpt_dir = os.path.dirname(args.ckpt)
-        else:                         # use default ckpt_dir
-            assert args.name is not None, 'Please specify the name of this run.'
-            ckpt_dir = os.path.join(RESULT_DIR, args.name)
-        self.ckpt_manager = CheckPointManager(ckpt_dir)
-
         # load modelrc
         if args.ckpt:  # provide ckpt
-            self.modelrc = self.ckpt_manager.load_config(args.ckpt, 'modelrc')
+            self.modelrc = CheckPointManager.load_config(args.ckpt, 'modelrc')
         else:  # load modelrc from file
             show(f'[RUNNER] Load modelrc from {args.modelrc}.')
             with open(args.modelrc, 'r') as f:
                 self.modelrc = yaml.load(f, Loader=yaml.FullLoader)
 
         # load taskrc
-        if args.resume or args.mode == 'evaluate':
-            self.taskrc = self.ckpt_manager.load_config(args.ckpt, 'taskrc')
+        if args.taskrc is None:
+            self.taskrc = CheckPointManager.load_config(args.ckpt, 'taskrc')
         else:
             show(f'[RUNNER] Load taskrc from {args.taskrc}.')
             with open(args.taskrc, 'r') as f:
@@ -73,17 +58,16 @@ class Runner:
         recursive_overwrite(self.taskrc, overwrite_rc.get('taskrc', {}))
 
         # dump config
-        self.ckpt_manager.dump_config(
-            {
+        os.makedirs(args.ckpt_dir, exist_ok=True)
+        dump_path = os.path.join(args.ckpt_dir, f"run_{time.strftime('%Y%m%d_%H%M%S')}.yaml")
+        CheckPointManager.dump_config(
+            save_conf = {
                 'modelrc': self.modelrc,
                 'taskrc': self.taskrc,
-                'args': vars(args)
+                'args': vars(self.args)
             },
-            file_name=f"train_{time.strftime('%Y%m%d_%H%M%S')}.yaml"
+            path = dump_path
         )
-
-        # set ckpt conf, such as save_mod, check_metrics, etc.
-        self.ckpt_manager.set(self.taskrc['ckpt'])
 
         # set random seed
         runner_conf = self.taskrc['runner']
@@ -119,19 +103,25 @@ class Runner:
         return optimizer, scheduler
 
 
-    def _get_modules_for_eval(self, criterion):
+    def _get_modules_for_eval(self, criterion = None):
         arch_conf = self.taskrc['arch']
 
         # select evaluator
         metrics = {}
-        for i, name in enumerate(arch_conf['metric']['select'], start=1):
-            show(f"[RUNNER] Metric {i}: {name}.")
-            # use importlib to avoid weird bug of 'BinnedAveragePrecision' not found
+        for name in arch_conf['metric']['select']:
             metrics[name] = create_instance(arch_conf['metric'][name])
-        if arch_conf['metric']['use_loss']:
+        if criterion is not None:
             loss_name = arch_conf['metric']['loss_name']
-            show(f"[RUNNER] Metric {i+1}: {loss_name}.")
+            assert loss_name not in metrics, f'Loss name {loss_name} has been used.'
             metrics[loss_name] = LossScore(criterion)
+
+        # show metrics
+        if len(metrics) >= 0:
+            show("[RUNNER] Metrics:")
+            for i, name in enumerate(metrics.keys(), start=1):
+                show(f"\t{i}. {name}")
+        else:
+            show("[RUNNER] No metrics.")
 
         return MetricCollection(metrics)
 
@@ -163,6 +153,8 @@ class Runner:
 
 
     def train(self):
+        show(f'[RUNNER] Mod: TRAIN')
+
         # initialize W&B
         if self.args.WandB:
             show(f'[RUNNER] Initialize W&B to record training.')
@@ -185,14 +177,13 @@ class Runner:
         metrics = self._get_modules_for_eval(criterion)
 
         # load model from checkpoint if have
-        if self.args.ckpt is not None:
+        if self.args.ckpt:
             # first move model to device to avoid bug of 'device mismatch'
             model.to(self.args.device)
-            param = self.ckpt_manager.load_param(self.args.ckpt, 'model')
-            model.load_state_dict(param)
+            model.load_state_dict(CheckPointManager.load_param(self.args.ckpt, 'model'))
             if self.args.resume:
-                optimizer.load_state_dict(self.ckpt_manager.load_param(self.args.ckpt, 'optimizer'))
-                scheduler.load_state_dict(self.ckpt_manager.load_param(self.args.ckpt, 'scheduler'))
+                optimizer.load_state_dict(CheckPointManager.load_param(self.args.ckpt, 'optimizer'))
+                scheduler.load_state_dict(CheckPointManager.load_param(self.args.ckpt, 'scheduler'))
 
         # watch model params in wandb if needed
         if self.args.WandB and self.taskrc['WandB']['track_params']:
@@ -201,8 +192,8 @@ class Runner:
         # prepare dataset and dataloader
         datasets_conf = self.taskrc['data']['datasets']
         loader_conf = self.taskrc['data']['dataloaders']
-        train_loader = self._get_dataloader(datasets_conf, loader_conf[self.args.train_loader], 'train')
-        valid_loader = self._get_dataloader(datasets_conf, loader_conf[self.args.valid_loader], 'valid')
+        train_loader = self._get_dataloader(datasets_conf, loader_conf[loader_conf['train_select']], 'train')
+        valid_loader = self._get_dataloader(datasets_conf, loader_conf[loader_conf['valid_select']], 'valid')
 
         # create trainer and valider
         runner_conf = self.taskrc['runner']
@@ -225,24 +216,32 @@ class Runner:
             **runner_conf['valider_kwargs']
         )
 
+        # create checkpoint manager if needed
+        if not self.args.disable_save:
+            ckpt_manager = CheckPointManager(self.args.ckpt_dir, **self.taskrc['ckpt'])
+
         # setup progress bar and other things
         pbar = tqdm(total=runner_conf['total_steps'], desc='Overall', dynamic_ncols=True, disable=self.args.slient)
-        if self.args.resume:
-            meta_conf = self.ckpt_manager.load_config(self.args.ckpt, 'meta')
+        if self.args.resume: # resume from checkpoint
+            meta_conf = CheckPointManager.load_config(self.args.ckpt, 'meta')
             start_step = meta_conf['step'] + 1
             best_step = meta_conf['best_step']
             best_result = meta_conf['best_result']
-            show(f'[RUNNER] Resume training from step {start_step}.')
             pbar.update(start_step)
-        else:
+            show(f'[RUNNER] Resume training from step {start_step}.')
+            show('-' * 50)
+            show(f'[RUNNER] Last Best result:')
+            self._show_valid_result(best_step, best_result)
+        else: # start from scratch
             start_step = 1
             best_step = 0
             best_result = {}
             show(f'[RUNNER] Start training from scratch.')
 
         # start training
+        show('-' * 50)
         for step in range(start_step, runner_conf['total_steps'] + 1):
-            # train one step or one epoch
+            # train one gradient step or one epoch
             if runner_conf['step_mod'] == 'grad':
                 trainer.one_step()
             elif runner_conf['step_mod'] == 'epoch':
@@ -250,6 +249,7 @@ class Runner:
             else:
                 raise ValueError(f'Unknown step_mod: {runner_conf["step_mod"]}')
 
+            # update one step
             pbar.update()
 
             # show result per log_freq steps
@@ -258,37 +258,43 @@ class Runner:
                 pbar.refresh() # refresh tqdm bar to show the latest result
                 self._show_train_result(step, trainer.lr, train_result)
                 show('-' * 50)
-                if self.args.WandB:
+                if self.args.WandB: # log train result to wandb
                     wandb.log(train_result, step=step, commit=False)
 
-            save_params = {
-                'model': model.state_dict(),
-                'optimizer': optimizer.state_dict(),
-                'scheduler': scheduler.state_dict()
-            }
-            save_confs = {
-                'modelrc': self.modelrc,
-                'taskrc': self.taskrc,
-                'meta': {'step': step, 'best_step': best_step, 'best_result': best_result}
-            }
-            print_slash = False
+            # prepare for saving
+            if not self.args.disable_save:
+                save_params = {
+                    'model': model.state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                    'scheduler': scheduler.state_dict()
+                }
+                save_confs = {
+                    'modelrc': self.modelrc,
+                    'taskrc': self.taskrc,
+                    'meta': {'step': step, 'best_step': best_step, 'best_result': best_result}
+                }
 
+            # should print slash in the end of this step
+            print_slash = False
 
             # validate a epoch per dev_freq steps
             if step % runner_conf['valid_freq'] == 0 or step == runner_conf['total_steps']:
                 valider.one_epoch()
                 current_result = valider.pop_result()
+
                 pbar.refresh() # refresh tqdm bar to show the latest result
                 self._show_valid_result(step, current_result)
                 print_slash = True
-                if self.args.WandB:
+
+                if self.args.WandB: # log valid result to wandb
                     wandb.log(current_result, step=step, commit=False)
+
                 # save model if better
                 if not self.args.disable_save:
-                    if self.ckpt_manager.check_better(current_result, best_result):
+                    if ckpt_manager.check_better(current_result, best_result):
                         best_step = step
                         best_result = current_result
-                        self.ckpt_manager.save_model(
+                        ckpt_manager.save_model(
                             ckpt_name='valid-best.pth',
                             params=save_params,
                             confs=save_confs,
@@ -297,21 +303,22 @@ class Runner:
 
 
             if step % runner_conf['save_freq'] == 0 and not self.args.disable_save:
-                self.ckpt_manager.save_model(
+                ckpt_manager.save_model(
                     ckpt_name=f'step-{step}.pth',
                     params=save_params,
                     confs=save_confs,
                     overwrite=self.args.overwrite
                 )
-                self.ckpt_manager.clean_old_ckpt('step-*.pth')
+                ckpt_manager.clean_old_ckpt('step-*.pth')
                 print_slash = True
 
             if print_slash:
                 show('-' * 50)
 
-            # log result to wandb
+            # log lr to wandb, and commit this step
             if self.args.WandB:
                 wandb.log({'lr':trainer.lr}, step=step, commit=True)
+
         show(f'[RUNNER] Training finished.')
         show(f'[RUNNER] Best result:')
         self._show_valid_result(best_step, best_result)
@@ -323,14 +330,17 @@ class Runner:
 
 
     def evaluate(self):
+        show(f'[RUNNER] Mod: EVALUATE')
+
         # load models
         model = self._get_model()
-        criterion = self._get_criterion()
-        metrics = self._get_modules_for_eval(criterion)
+        if self.taskrc['arch']['metric']['use_loss']:
+            metrics = self._get_modules_for_eval(self._get_criterion())
+        else:
+            metrics = self._get_modules_for_eval()
 
         # load model from checkpoint if have
-        param = self.ckpt_manager.load_param(self.args.ckpt, 'model')
-        model.load_state_dict(param)
+        model.load_state_dict(CheckPointManager.load_param(self.args.ckpt, 'model'))
 
         # prepare dataset and dataloader
         loader_conf = self.taskrc['data']['dataloaders']
@@ -348,21 +358,12 @@ class Runner:
         )
 
         # start validating
+        show("[RUNNER] Start evaluating.")
+        show('-' * 50)
         valider.one_epoch()
         current_result = valider.pop_result()
 
         # show result
-        show(f'[RUNNER] Evaluation finished.')
         self._show_valid_result(0, current_result)
 
         valider.close()
-
-
-    def run(self):
-        if self.args.mode == 'train':
-            self.train()
-        elif self.args.mode == 'evaluate':
-            assert self.args.ckpt is not None, 'Please specify the checkpoint to evaluate.'
-            self.evaluate()
-        else: # should not happen
-            raise ValueError(f'Unknown mode: {self.args.mode}')

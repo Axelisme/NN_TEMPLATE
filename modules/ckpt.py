@@ -13,28 +13,26 @@ from util.io import show
 
 
 class CheckPointManager:
-    def __init__(self, ckpt_dir: str):
+    def __init__(self, ckpt_dir: str, check_metrics: list = [], keep_num: int = -1):
         show(f"[CheckpointManager] Using {ckpt_dir} as checkpoint directory")
         self.ckpt_dir = Path(ckpt_dir)
         self.ckpt_dir.mkdir(parents=True, exist_ok=True)
 
-        # default setting
-        self.save_mod = 'max'
-        self.check_metrics = []
-        self.keep_num = -1
+        if len(check_metrics) >= 0:
+            show("[CheckpointManager] Save policy:")
+            for i, metric in enumerate(check_metrics, start=1):
+                show(f"\t{i}. Name: {metric['name']:>20},\tMod: {metric['mod']}")
+        else:
+            show("[CheckpointManager] Save policy: ALAWYS NOT SAVE")
+        self.check_metrics = check_metrics
 
-
-    def set(self, ckpt_conf: Dict[str, Dict|Any]):
-        """set the action of checkpoint manager"""
-        self.check_metrics = ckpt_conf['check_metrics']
-        assert isinstance(self.check_metrics, list), f"check_metrics should be list, but got {self.check_metrics}"
-        names = [check_metric['name'] for check_metric in self.check_metrics]
-        show(f"[CheckpointManager] Using {names} as check_metrics")
-
-        self.keep_num = ckpt_conf['keep_num']
-        assert isinstance(self.keep_num, int), f"keep_num should be int, but got {self.keep_num}"
-        assert self.keep_num >= -1, f"keep_num should be greater than -1, but got {self.keep_num}"
-        show(f"[CheckpointManager] Keep {self.keep_num} checkpoints in ckpt_dir")
+        if keep_num == -1:
+            show(f"[CheckpointManager] Keep all checkpoints in ckpt_dir")
+        elif keep_num >= 0:
+            show(f"[CheckpointManager] Keep at most {keep_num} checkpoints in ckpt_dir")
+        else:
+            raise ValueError(f"keep_num must be non-negative, but got {keep_num}")
+        self.keep_num = keep_num
 
 
     def check_better(self, current_result, best_result) -> bool:
@@ -53,23 +51,22 @@ class CheckPointManager:
                 continue
         return False
 
-
-    def dump_config(self, save_conf: Dict, file_name: str):
+    @classmethod
+    def dump_config(cls, save_conf: Dict, path: str, overwrite: bool = False):
         """Save the config file."""
-        config_path = self.ckpt_dir / file_name
-        show(f'[CheckpointManager] Dumping config to {config_path}')
-        with open(config_path, 'x') as f:
+        show(f'[CheckpointManager] Dumping config to {path}')
+        with open(path, 'w' if overwrite else 'x') as f:
             yaml.dump(save_conf, f, default_flow_style=False)
 
-
-    def load_config(self, ckpt_path: str, conf_name: str):
+    @classmethod
+    def load_config(cls, ckpt_path: str, conf_name: str):
         # use mmap to save memory
         ckpt = torch.load(ckpt_path, map_location='cpu', mmap=True)
         show(f'[CheckpointManager] Loading config {conf_name} from {ckpt_path}')
         return ckpt['config'][conf_name]
 
-
-    def load_param(self, ckpt_path: str, param_name: str):
+    @classmethod
+    def load_param(cls, ckpt_path: str, param_name: str):
         # use mmap to save memory
         ckpt = torch.load(ckpt_path, map_location='cpu', mmap=True)
         return ckpt['params'][param_name]

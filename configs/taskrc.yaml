@@ -59,6 +59,8 @@ data:
         dataset_path: './data/processed/template/test.h5'
 
   dataloaders:
+    train_select: 'train_loader'
+    valid_select: 'devel_loader'
     train_loader:
       kwargs:
         batch_size: 32
@@ -84,7 +86,7 @@ data:
 
 runner: &Runner
   step_mod: 'grad' # 'epoch' or 'grad'
-  total_steps: 1100
+  total_steps: 2100
   log_freq: 100
   valid_freq: 1000
   save_freq: 500

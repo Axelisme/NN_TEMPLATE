@@ -18,8 +18,5 @@ class TemplateModel(nn.Module):
         """Forward a batch of data through the model."""
         x = self.fn1(x)
         x = self.fn2(x)
-        # waste some time
-        for _ in range(20):
-            y = torch.rand(100, 100)
         return x
 
