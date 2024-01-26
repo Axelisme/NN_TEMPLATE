@@ -1,27 +1,36 @@
 # NEURAL NETWORK TEMPLATE
 
-Dependence: `torch`, `tqdm`, `torchmetric`, `wandb`, `numpy`,`pyyaml`
-
 ## Usage
 ### generate dataset
 ```bash
-python -m scripts.{xxx}_generator
+python scripts/{xxx}_generator.py
 ```
-### train
-Default config path: `configs/template.yaml`
+### start new train
+Default model config path: `configs/modelrc.yaml`  
+Default task config path: `configs/taskrc.yaml`
 ```bash
-python -m scripts.run      -m {train/evaluate}
-                           -n {name}
-                           [-c {config_path}]
-                           [-s {seed}]
-                           [--train_loader {loader}]
-                           [--valid_loader {loader}]
-                           [--WandB]
-                           [--load {path}]
-                           [--slient]
-                           [--overwrite]
+python scripts/run_model.py -m train
+                            -n {name}
+                            [-M {modelrc}]
+                            [-T {taskrc}]
+                            [-o {ckpt_dir}]
+                            [--WandB]
+                            [--slient]
+                            [--overwrite]
+```
+### resume train
+```bash
+python scripts/run_model.py -m train -e {ckpt} -a
+```
+### evaluate
+```bash
+python scripts/run_model.py -m evaluate -e {ckpt} -t {loader1} {loader2} ...
 ```
 ### sweep
+Default model config path: `configs/modelrc.yaml`  
+Default task config path: `configs/taskrc.yaml`
 ```bash
-python -m scripts.sweep -c {config_path}
+python scripts/sweep.py -s {sweeprc}
+                        [-M {modelrc}]
+                        [-T {taskrc}]
 ```
