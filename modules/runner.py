@@ -155,21 +155,6 @@ class Runner:
     def train(self):
         show(f'[Runner] Mod: TRAIN')
 
-        # initialize W&B
-        if self.args.WandB:
-            show(f'[Runner] Initialize W&B to record training.')
-            if self.args.resume:
-                wandb.init(project=self.taskrc['WandB']['project'], resume=True)
-            else:
-                wandb_conf = self.taskrc['WandB']
-                assert self.args.name is not None, 'Please specify the name of this run.'
-                wandb.init(
-                    project=wandb_conf['project'],
-                    name=self.args.name,
-                    reinit=True,
-                    **wandb_conf['init_kwargs']
-                )
-
         # load models
         model = self._get_model()
         criterion = self._get_criterion()
@@ -185,10 +170,6 @@ class Runner:
                 optimizer.load_state_dict(CheckPointManager.load_param(self.args.ckpt, 'optimizer'))
                 scheduler.load_state_dict(CheckPointManager.load_param(self.args.ckpt, 'scheduler'))
 
-        # watch model params in wandb if needed
-        if self.args.WandB and self.taskrc['WandB']['track_params']:
-            wandb.watch(models=model, criterion=criterion, **self.taskrc['WandB']['watch_kwargs'])
-
         # prepare dataset and dataloader
         datasets_conf = self.taskrc['data']['datasets']
         loader_conf = self.taskrc['data']['dataloaders']
@@ -198,6 +179,58 @@ class Runner:
         train_loader = self._get_dataloader(datasets_conf, loader_conf[loader_conf['train_select']], 'train')
         show("[Runner] Valid dataset:")
         valid_loaders = [self._get_dataloader(datasets_conf, loader_conf[name], name) for name in loader_conf['valid_selects']]
+
+        # create checkpoint manager if needed
+        if not self.args.disable_save:
+            ckpt_manager = CheckPointManager(self.args.ckpt_dir, **self.taskrc['ckpt'])
+
+        # init status from checkpoint or from scratch
+        if self.args.resume: # resume from checkpoint
+            meta_conf = CheckPointManager.load_config(self.args.ckpt, 'meta')
+            start_step = meta_conf['step']
+            best_step = meta_conf['best_step']
+            best_results = meta_conf['best_results']
+            run_id = meta_conf.get('run_id')
+            if self.args.WandB:
+                wandb_conf = self.taskrc['WandB']
+                if run_id is None: # generate run_id if not have
+                    run_id = wandb.util.generate_id()
+                    show(f'[WandB] Cannot find run_id in checkpoint.')
+                    show(f'[WandB] Generate new run_id: {run_id}.')
+                show(f'[Runner] Initialize W&B to record training.')
+                if self.args.resume: # resume from checkpoint
+                    wandb.init(
+                        project=wandb_conf['project'],
+                        resume="allow",
+                        id=run_id,
+                        **wandb_conf['init_kwargs']
+                    )
+            show(f'[Runner] Resume training from step {start_step}.')
+            show('-' * 50)
+            show(f'[Runner] Last Best result:')
+            self._show_valid_results(best_step, best_results)
+        else: # start from scratch
+            start_step = 0
+            best_step = 0
+            best_results = {}
+            run_id = None
+            if self.args.WandB:
+                assert self.args.name is not None, 'Please specify the name of this run.'
+                run_id = wandb.util.generate_id()
+                show(f'[WandB] Generate new run_id: {run_id}.')
+                wandb_conf = self.taskrc['WandB']
+                wandb.init(
+                    project=wandb_conf['project'],
+                    name=self.args.name,
+                    id=run_id,
+                    reinit=True,
+                    **wandb_conf['init_kwargs']
+                )
+            show(f'[Runner] Start training from scratch.')
+
+        # watch model params in wandb if needed
+        if self.args.WandB and self.taskrc['WandB']['track_params']:
+            wandb.watch(models=model, criterion=criterion, **self.taskrc['WandB']['watch_kwargs'])
 
         # create trainer and valider
         runner_conf = self.taskrc['runner']
@@ -225,31 +258,10 @@ class Runner:
             **runner_conf['valider_kwargs']
         )
 
-        # create checkpoint manager if needed
-        if not self.args.disable_save:
-            ckpt_manager = CheckPointManager(self.args.ckpt_dir, **self.taskrc['ckpt'])
-
-        # setup progress bar and other things
-        pbar = tqdm(total=runner_conf['total_steps'], desc='Overall', dynamic_ncols=True, disable=self.args.silent)
-        if self.args.resume: # resume from checkpoint
-            meta_conf = CheckPointManager.load_config(self.args.ckpt, 'meta')
-            start_step = meta_conf['step'] + 1
-            best_step = meta_conf['best_step']
-            best_results = meta_conf['best_results']
-            pbar.update(start_step)
-            show(f'[Runner] Resume training from step {start_step}.')
-            show('-' * 50)
-            show(f'[Runner] Last Best result:')
-            self._show_valid_results(best_step, best_results)
-        else: # start from scratch
-            start_step = 1
-            best_step = 0
-            best_results = {}
-            show(f'[Runner] Start training from scratch.')
-
         # start training
         show('-' * 50)
-        for step in range(start_step, runner_conf['total_steps'] + 1):
+        pbar = tqdm(total=runner_conf['total_steps'], initial=start_step, desc='Overall', dynamic_ncols=True, disable=self.args.silent)
+        for step in range(start_step+1, runner_conf['total_steps'] + 1):
             # train one gradient step or one epoch
             if runner_conf['step_mod'] == 'grad':
                 trainer.one_step()
@@ -259,7 +271,8 @@ class Runner:
                 raise ValueError(f'Unknown step_mod: {runner_conf["step_mod"]}')
 
             # update one step
-            pbar.update()
+            if not self.args.silent:
+                pbar.update()
 
             # should print slash in the end of this step
             print_slash = False
@@ -267,7 +280,8 @@ class Runner:
             # show result per log_freq steps
             if step % runner_conf['log_freq'] == 0 or step == runner_conf['total_steps']:
                 train_result = trainer.pop_result()
-                pbar.refresh() # refresh tqdm bar to show the latest result
+                if not self.args.silent:
+                    pbar.refresh() # refresh tqdm bar to show the latest result
                 self._show_train_result(step, trainer.lr, train_result)
                 print_slash = True
                 if self.args.WandB: # log train result to wandb
@@ -284,7 +298,12 @@ class Runner:
                 save_confs = {
                     'modelrc': self.modelrc,
                     'taskrc': self.taskrc,
-                    'meta': {'step': step, 'best_step': best_step, 'best_results': best_results}
+                    'meta': {
+                        'step': step,
+                        'best_step': best_step,
+                        'best_results': best_results,
+                        'run_id': run_id
+                    }
                 }
 
             if step % runner_conf['save_freq'] == 0 and not self.args.disable_save:
@@ -310,7 +329,8 @@ class Runner:
                         log_result = {f'{name}-{k}':v for k,v in current_result.items()}
                         wandb.log(log_result, step=step, commit=False)
 
-                pbar.refresh() # refresh tqdm bar to show the latest result
+                if not self.args.silent:
+                    pbar.refresh() # refresh tqdm bar to show the latest result
                 self._show_valid_results(step, current_results)
                 print_slash = True
 

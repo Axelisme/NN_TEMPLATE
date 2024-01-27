@@ -40,6 +40,7 @@ class Trainer:
 
         self.loss_metrics = MeanMetric()
         self.metrics = metrics
+        self.silent = silent
         self.device = torch.device(device)
 
         self.train_bar = tqdm(total=len(train_loader), desc='Train', dynamic_ncols=True, disable=silent)
@@ -112,8 +113,9 @@ class Trainer:
 
             # update parameters
             if steps >= self.grad_acc_steps:
-                self.train_bar.update(steps)
-                self.train_bar.refresh()
+                if not self.silent:
+                    self.train_bar.update(steps)
+                    self.train_bar.refresh()
                 self.optimizer.step()
                 self.optimizer.zero_grad()
                 self.scheduler.step()
@@ -146,7 +148,9 @@ class Trainer:
 
             # update parameters
             if steps % self.grad_acc_steps == 0 or steps == len(self.train_loader):
-                self.train_bar.update(steps)
+                if not self.silent:
+                    self.train_bar.update(steps)
+                    self.train_bar.refresh()
                 self.optimizer.step()
                 self.optimizer.zero_grad()
                 self.scheduler.step()

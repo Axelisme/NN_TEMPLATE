@@ -84,7 +84,7 @@ data:
 
 runner: &Runner
   step_mod: 'grad' # 'epoch' or 'grad'
-  total_steps: 2100
+  total_steps: 5000
   log_freq: 100
   valid_freq: 1000
   save_freq: 500
