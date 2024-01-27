@@ -15,13 +15,14 @@ def main():
     parser.add_argument('-m', '--mode', type=str, choices=['train', 'evaluate'], required=True, help='mode of this run')
     parser.add_argument('-e', '--ckpt', type=str, help='load existing checkpoint')
     parser.add_argument('-T', '--taskrc', type=str, help='taskrc file, default to configs/taskrc.yaml')
+    parser.add_argument('-o', '--override', type=str, help='override config, like "modelrc.A.B=1,modelrc.C=2"')
     parser.add_argument('--device', type=str, default='cuda', help='device to use, default to "cuda"')
     parser.add_argument('--silent', action='store_true', help='silent or not')
     # training arguments
     parser.add_argument('-n', '--name', type=str, help='name of this run')
     parser.add_argument('-M', '--modelrc', type=str, help='modelrc file, use to train a new model, default to configs/modelrc.yaml')
     parser.add_argument('-a', '--resume', action='store_true', help='resume training from existing ckpt, default to False')
-    parser.add_argument('-o', '--ckpt_dir', type=str, help='checkpoint directory, default to checkpoints parent dir or RESULTS_DIR/{name}')
+    parser.add_argument('-d', '--ckpt_dir', type=str, help='checkpoint directory, default to checkpoints parent dir or RESULTS_DIR/{name}')
     parser.add_argument('--WandB', action='store_true', help='use W&B to log')
     parser.add_argument('--disable_save', action='store_true', help='disable auto save ckpt')
     parser.add_argument('--overwrite', action='store_true', help='overwrite existing ckpt or not')
@@ -74,8 +75,22 @@ def main():
     else:
         raise ValueError(f'Unknown mode {args.mode}')
 
+    # create override dict
+    override_dict = {}
+    if args.override:
+        for statement in args.override.split(','):
+            keys, value = statement.split('=')
+            value = value.strip()
+            keys = [key.strip() for key in keys.split('.')]
+            cur_dict = override_dict
+            for key in keys[:-1]:
+                if key not in cur_dict:
+                    cur_dict[key] = {}
+                cur_dict = cur_dict[key]
+            cur_dict[keys[-1]] = eval(value)
+
     # run
-    runner = Runner(args)
+    runner = Runner(args, override_dict)
     eval(f'runner.{args.mode}()')
 
 

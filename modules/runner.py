@@ -20,8 +20,7 @@ def recursive_overwrite(conf: Dict[str,Dict|Any], new_conf: Dict[str,Dict|Any]):
     for key, value in new_conf.items():
         if isinstance(value, dict):
             if key not in conf:
-                print(f"something wrong with {key}")
-                raise ValueError
+                raise ValueError(f'Cannot find {key} in config.')
             recursive_overwrite(conf[key], value)
         elif conf[key] == value:
             show(f'[Runner] Keep {key} as {value}.')

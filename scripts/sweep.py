@@ -38,6 +38,7 @@ def get_default_args(modelrc: str, taskrc: str) -> Namespace:
         'mode' : 'train',
         'ckpt' : None,
         'taskrc' : taskrc,
+        'override' : None,
         'device' : 'cuda:0',
         'silent' : False,
         'name' : 'sweep_run',
