@@ -1,7 +1,7 @@
 
 """define a class for training a model"""
 
-from typing import Dict, Optional
+from typing import Dict, Optional, Callable
 from tqdm import tqdm
 from argparse import Namespace
 
@@ -27,6 +27,8 @@ class Trainer:
             criterion: nn.Module,
             device: str,
             metrics: Optional[MetricCollection],
+            batch_process_fn: Callable|None = None,
+            postprocess_fn: Callable|None = None,
             silent: bool = False,
             grad_acc_steps:int = 1,
         ):
@@ -40,6 +42,8 @@ class Trainer:
 
         self.loss_metrics = MeanMetric()
         self.metrics = metrics
+        self.batch_process_fn = batch_process_fn
+        self.postprocess_fn = postprocess_fn
         self.silent = silent
         self.device = torch.device(device)
 
@@ -93,12 +97,20 @@ class Trainer:
         for steps, (input, *other) in enumerate(self.cycle_loader, start=1):
             # move input and label to device
             input = input.to(self.device)
+            other = [item.to(self.device, non_blocking=True) for item in other if hasattr(item, 'to')]
+
+            # batch process
+            if self.batch_process_fn is not None:
+                input, *other = self.batch_process_fn(input, *other)
 
             # forward
             output:Tensor = self.model(input)
 
+            # postprocess
+            if self.postprocess_fn is not None:
+                output, *other = self.postprocess_fn(output, *other)
+
             # compute loss and record
-            other = [item.to(self.device) for item in other if isinstance(item, Tensor)]
             loss:Tensor = self.criterion(output, *other)
             self.loss_metrics.update(loss)
 
@@ -127,12 +139,20 @@ class Trainer:
         for steps, (input, *other) in enumerate(self.train_loader, start=1):
             # move input to device
             input = input.to(self.device)
+            other = [item.to(self.device, non_blocking=True) for item in other if hasattr(item, 'to')]
+
+            # batch process
+            if self.batch_process_fn is not None:
+                input, *other = self.batch_process_fn(input, *other)
 
             # forward
             output:Tensor = self.model(input)
 
+            # postprocess
+            if self.postprocess_fn is not None:
+                output, *other = self.postprocess_fn(output, *other)
+
             # compute loss and record
-            other = [item.to(self.device) for item in other if isinstance(item, Tensor)]
             loss:Tensor = self.criterion(output, *other)
             self.loss_metrics.update(loss)
             del input

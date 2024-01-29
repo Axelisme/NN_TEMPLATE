@@ -2,11 +2,14 @@ import os
 import yaml
 import time
 import wandb
-from typing import Dict, Any
+import torch
+from importlib import import_module
+from typing import Dict, Any, Callable
 from argparse import Namespace
 from torch.utils.data import DataLoader
 from torchmetrics import MetricCollection
 from tqdm.auto import tqdm
+from functools import partial
 
 from util.io import show
 from util.utility import init, create_instance
@@ -124,11 +127,19 @@ class Runner:
         return metrics, loss_metric
 
     @staticmethod
-    def _get_dataloader(datasets_conf:Dict, loader_conf:Dict, mode:str):
+    def _get_dataloader(datasets_conf:Dict, loader_conf:Dict, select:str):
         dataset = loader_conf['dataset']
-        show(f"\t{mode.capitalize()} dataset: {dataset}.")
+        show(f"\t{select.capitalize()} dataset: {dataset}.")
         dataset = create_instance(datasets_conf[dataset])
         return DataLoader(dataset, **loader_conf['kwargs'])
+
+
+    def _get_process_fn(self, process_conf: Dict[str, Dict[str, Any]], select: str|None):
+        if select:
+            conf = process_conf[select]
+            module = import_module(conf['module'])
+            return partial(getattr(module, conf['name']), **conf['kwargs'])
+        return None
 
 
     def _show_train_result(self, step: int, lr: float, train_result: Dict[str,float]):
@@ -171,14 +182,24 @@ class Runner:
                 scheduler.load_state_dict(CheckPointManager.load_param(self.args.ckpt, 'scheduler'))
 
         # prepare dataset and dataloader
-        datasets_conf = self.taskrc['data']['datasets']
-        loader_conf = self.taskrc['data']['dataloaders']
-        if len(loader_conf['valid_selects']) != len(set(loader_conf['valid_selects'])):
-            raise ValueError('Duplicate loaders in taskrc["data"]["loader"]["valid_selects"]')
+        data_conf = self.taskrc['data']
+        datasets_conf = data_conf['datasets']
+        loader_conf = data_conf['dataloaders']
+        if len(data_conf['valid_selects']) != len(set(data_conf['valid_selects'])):
+            raise ValueError('Duplicate loaders in taskrc["data"]["valid_selects"]')
+
         show("[Runner] Train dataset:")
-        train_loader = self._get_dataloader(datasets_conf, loader_conf[loader_conf['train_select']], 'train')
+        train_select = data_conf['train_select']
+        train_loader = self._get_dataloader(datasets_conf, loader_conf[train_select], 'train')
         show("[Runner] Valid dataset:")
-        valid_loaders = [self._get_dataloader(datasets_conf, loader_conf[name], name) for name in loader_conf['valid_selects']]
+        valid_selects = data_conf['valid_selects']
+        valid_loaders = [self._get_dataloader(datasets_conf, loader_conf[select], select) for select in valid_selects]
+
+        # create batch processor and post processor
+        process_conf = data_conf['process_fns']
+        train_batch_fn = self._get_process_fn(process_conf, loader_conf[train_select]['batch_process_fn'])
+        valid_batch_fns = [self._get_process_fn(process_conf, loader_conf[select]['batch_process_fn']) for select in valid_selects]
+        postprocess_fn = self._get_process_fn(process_conf, data_conf['postprocess_fn'])
 
         # create checkpoint manager if needed
         if not self.args.disable_save:
@@ -243,6 +264,8 @@ class Runner:
             criterion=criterion,
             device=self.args.device,
             metrics=MetricCollection(metrics) if metric_conf['apply_on_train'] else None,
+            batch_process_fn=train_batch_fn,
+            postprocess_fn=postprocess_fn,
             silent=self.args.silent,
             **runner_conf['trainer_kwargs']
         )
@@ -254,6 +277,7 @@ class Runner:
             model=model,
             metrics=MetricCollection(valider_metrics),
             device=self.args.device,
+            postprocess_fn=postprocess_fn,
             silent=self.args.silent,
             **runner_conf['valider_kwargs']
         )
@@ -321,13 +345,22 @@ class Runner:
                 if print_slash:
                     show('-' * 50)
                 current_results = {}
-                for name, valid_loader in zip(loader_conf['valid_selects'], valid_loaders):
-                    valider.one_epoch(valid_loader, name)
+                for name, valid_loader, batch_fn in zip(data_conf['valid_selects'], valid_loaders, valid_batch_fns):
+                    # free gpu cache
+                    if 'cuda' in self.args.device:
+                        with torch.cuda.device(self.args.device):
+                            torch.cuda.empty_cache()
+                    # validate a epoch
+                    valider.one_epoch(valid_loader, name, batch_fn)
                     current_result = valider.pop_result()
                     current_results[name] = current_result
                     if self.args.WandB: # log valid result to wandb
                         log_result = {f'{name}-{k}':v for k,v in current_result.items()}
                         wandb.log(log_result, step=step, commit=False)
+                # free gpu cache
+                if 'cuda' in self.args.device:
+                    with torch.cuda.device(self.args.device):
+                        torch.cuda.empty_cache()
 
                 if not self.args.silent:
                     pbar.refresh() # refresh tqdm bar to show the latest result

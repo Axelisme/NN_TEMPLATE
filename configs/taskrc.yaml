@@ -37,49 +37,62 @@ arch: &Arch
 
 
 data:
+  train_select: 'train' # select train dataloader
+  valid_selects:        # select valid dataloaders
+    - 'devel'
+    - 'test'
+  postprocess_fn: 'postprocess_fn'
+
+  process_fns:
+    batch_process_fn: # input: (batch, *other, **kwargs)
+      name: 'batch_process'
+      module: 'custom.process.template'
+      kwargs: {}
+    postprocess_fn:   # input: (output, *other, **kwargs)
+      name: 'postprocess'
+      module: 'custom.process.template'
+      kwargs: {}
+
   datasets:
-    train_hdf5_template:
+    train_hdf5:
       name: 'HDF5DataSet'
       module: 'custom.dataset.hdf5_dataset'
       kwargs:
         dataset_path: './data/processed/template/train.h5'
-    devel_hdf5_template:
+    devel_hdf5:
       name: 'HDF5DataSet'
       module: 'custom.dataset.hdf5_dataset'
       kwargs:
         dataset_path: './data/processed/template/devel.h5'
-    test_hdf5_template:
+    test_hdf5:
       name: 'HDF5DataSet'
       module: 'custom.dataset.hdf5_dataset'
       kwargs:
         dataset_path: './data/processed/template/test.h5'
 
   dataloaders:
-    train_select: 'train'
-    valid_selects:
-      - 'devel'
-      - 'test'
     train:
-      kwargs:
+      kwargs: &Train_kwargs
         batch_size: 32
         shuffle: True
         pin_memory: True
-        num_workers: 0
-      dataset: 'train_hdf5_template'
+        num_workers: 4
+        persistent_workers: True
+      dataset: 'train_hdf5'
+      batch_process_fn: 'batch_process_fn'
     devel:
-      kwargs:
+      kwargs: &Eval_kwargs
         batch_size: 1
         shuffle: False
         pin_memory: True
         num_workers: 0
-      dataset: 'devel_hdf5_template'
+        persistent_workers: False
+      dataset: 'devel_hdf5'
+      batch_process_fn: ~ # None implies do nothing
     test:
-      kwargs:
-        batch_size: 1
-        shuffle: False
-        pin_memory: True
-        num_workers: 0
-      dataset: 'test_hdf5_template'
+      kwargs: *Eval_kwargs
+      dataset: 'test_hdf5'
+      batch_process_fn: ~ # None implies do nothing
 
 
 runner: &Runner
