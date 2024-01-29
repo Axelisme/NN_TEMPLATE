@@ -1,57 +1,66 @@
-arch: &Arch
-  optimizer:
-    select: 'AdamW'
-    AdamW:
-      name: 'AdamW'
-      module: 'torch.optim'
-      kwargs:
-        lr: 0.0003
+runner: &Runner
+  step_mod: 'grad' # 'epoch' or 'grad'
+  total_steps: 5000
+  log_freq: 100
+  valid_freq: 1000
+  save_freq: 500
+  seed: 0
+  trainer_kwargs:
+    grad_acc_steps: 1
+  valider_kwargs: {}
 
-  scheduler:
-    select: 'ConstantLR'
-    ConstantLR:
-      name: 'ConstantLR'
-      module: 'torch.optim.lr_scheduler'
-      kwargs:
-        total_iters: 0
+optimizer:
+  select: 'AdamW'
+  AdamW:
+    name: 'AdamW'
+    module: 'torch.optim'
+    kwargs:
+      lr: 0.0003
 
-  loss:
-    select: 'CELoss'
-    CELoss:
-      name: 'CrossEntropyLoss'
-      module: 'torch.nn'
-      kwargs: {}
+scheduler:
+  select: 'ConstantLR'
+  ConstantLR:
+    name: 'ConstantLR'
+    module: 'torch.optim.lr_scheduler'
+    kwargs:
+      total_iters: 0
 
-  metric:
-    use_loss: True
-    loss_name:  &Loss_name 'val_loss'
-    apply_on_train: True
-    select:
-      - &Acc 'acc'
-    acc:
-      name: 'MulticlassAccuracy'
-      module: 'torchmetrics.classification'
-      kwargs:
-        num_classes: 8
-        average: 'macro'
+loss:
+  select: 'CELoss'
+  CELoss:
+    name: 'CrossEntropyLoss'
+    module: 'torch.nn'
+    kwargs: {}
 
+metric:
+  use_loss: True
+  loss_name: &Loss_name 'val_loss'
+  apply_on_train: True
+  selects:
+    - &Acc 'acc'
+  acc:
+    name: 'MulticlassAccuracy'
+    module: 'torchmetrics.classification'
+    kwargs:
+      num_classes: 8
+      average: 'macro'
+
+ckpt:
+  check_metrics:
+    - {name: *Acc, mod: 'max'}
+    - {name: *Loss_name, mod: 'min'}
+  keep_num: 3
 
 data:
-  train_select: 'train' # select train dataloader
-  valid_selects:        # select valid dataloaders
-    - 'devel'
-    - 'test'
-  postprocess_fn: 'postprocess_fn'
+  train_dataset: 'train_hdf5'                 # select train dataset
+  valid_datasets: ['devel_hdf5', 'test_hdf5'] # select valid datasets
+  batch_preprocess: False # apply to all datasets
+  augment: True           # only apply on train dataset, after batch_preprocess
 
-  process_fns:
-    batch_process_fn: # input: (batch, *other, **kwargs)
-      name: 'batch_process'
-      module: 'custom.process.template'
-      kwargs: {}
-    postprocess_fn:   # input: (output, *other, **kwargs)
-      name: 'postprocess'
-      module: 'custom.process.template'
-      kwargs: {}
+  train_dataloader: 'trainloader'
+  valid_dataloader: 'validloader'
+  batch_preprocess_fn: ~
+  augment_fn: 'batch_augment_fn'
 
   datasets:
     train_hdf5:
@@ -71,55 +80,38 @@ data:
         dataset_path: './data/processed/template/test.h5'
 
   dataloaders:
-    train:
-      kwargs: &Train_kwargs
+    trainloader:
+      kwargs:
         batch_size: 32
         shuffle: True
         pin_memory: True
         num_workers: 4
         persistent_workers: True
-      dataset: 'train_hdf5'
-      batch_process_fn: 'batch_process_fn'
-    devel:
-      kwargs: &Eval_kwargs
+      collate_fn: 'train_collate_fn'
+    validloader:
+      kwargs:
         batch_size: 1
         shuffle: False
         pin_memory: True
         num_workers: 0
         persistent_workers: False
-      dataset: 'devel_hdf5'
-      batch_process_fn: ~ # None implies do nothing
-    test:
-      kwargs: *Eval_kwargs
-      dataset: 'test_hdf5'
-      batch_process_fn: ~ # None implies do nothing
+      collate_fn: ~
 
-
-runner: &Runner
-  step_mod: 'grad' # 'epoch' or 'grad'
-  total_steps: 5000
-  log_freq: 100
-  valid_freq: 1000
-  save_freq: 500
-  seed: 0
-  trainer_kwargs:
-    grad_acc_steps: 1
-  valider_kwargs: {}
-
-
-ckpt:
-  check_metrics:
-    - {name: *Acc, mod: 'max'}
-    - {name: *Loss_name, mod: 'min'}
-  keep_num: 3
-
+  process_fns:
+    batch_augment_fn: # input: (input, *other, **kwargs)
+      name: 'my_augment_fn'
+      module: 'custom.dataprocess.template'
+      kwargs: {}
+    train_collate_fn: # input: (batch, **kwargs)
+      name: 'default_collate'
+      module: 'torch.utils.data'
+      kwargs: {}
 
 WandB:
   project: &P 'Template_project'
   track_params: True
   init_kwargs:
     config:
-      arch: *Arch
       runner: *Runner
   watch_kwargs:
     log: 'all'

@@ -31,8 +31,11 @@ def init(seed : int, start_method:str = 'forkserver') -> None:
     set_seed(seed=seed)
     cudnn.benchmark = True
 
+def import_instance(select_conf):
+    """import instance of class"""
+    module = importlib.import_module(select_conf['module'])
+    return getattr(module, select_conf['name'])
 
 def create_instance(select_conf, *args, **kwargs):
     """create instance of class"""
-    module = importlib.import_module(select_conf['module'])
-    return getattr(module, select_conf['name'])(*args, **kwargs, **select_conf['kwargs'])
+    return import_instance(select_conf)(*args, **kwargs, **select_conf['kwargs'])

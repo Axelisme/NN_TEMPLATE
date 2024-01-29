@@ -28,13 +28,16 @@ def main():
     parser.add_argument('--overwrite', action='store_true', help='overwrite existing ckpt or not')
     # evaluating arguments
     # accept list of loaders
-    parser.add_argument('-t', '--valid_loaders', nargs='+', type=str, help='validation loaders, required while evaluating')
+    parser.add_argument('-t', '--valid_datasets', nargs='+', type=str, help='validation datasets, required while evaluating')
+    parser.add_argument('-l', '--valid_dataloader', type=str, help='validation dataloader, or load default valid dataloader from checkpoint')
     args = parser.parse_args()
 
     # check arguments
     if args.mode == 'train':
-        if args.valid_loaders:
-            parser.error('While training, you cannot specify --valid_loader')
+        invalid_flags = ['valid_datasets', 'valid_dataloader']
+        for flag in invalid_flags:
+            if getattr(args, flag):
+                parser.error(f'While training, you cannot specify --{flag}')
         if args.ckpt:
             if args.modelrc:
                 parser.error('While loading existing ckpt, you cannot specify --modelrc')
@@ -60,7 +63,7 @@ def main():
             if args.ckpt_dir is None:
                 args.ckpt_dir = os.path.join(RESULT_DIR, args.name)
     elif args.mode == 'evaluate':
-        must_specify = ['ckpt', 'valid_loaders']
+        must_specify = ['ckpt', 'valid_datasets']
         invalid_flags = ['name', 'modelrc', 'resume', 'WandB', 'disable_save', 'overwrite']
         for flag in must_specify:
             if getattr(args, flag) is None:
@@ -68,8 +71,8 @@ def main():
         for flag in invalid_flags:
             if getattr(args, flag):
                 parser.error(f'While evaluating, you cannot specify --{flag}')
-        if len(args.valid_loaders) != len(set(args.valid_loaders)):
-            parser.error('Duplicate loaders in --valid_loader')
+        if len(args.valid_datasets) != len(set(args.valid_datasets)):
+            parser.error('Duplicate datasets in --valid_datasets')
         if not args.ckpt_dir:
             args.ckpt_dir = os.path.dirname(args.ckpt)
     else:

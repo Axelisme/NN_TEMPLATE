@@ -21,13 +21,13 @@ class Valider:
             model: nn.Module,
             metrics: MetricCollection,
             device: str,
-            postprocess_fn: Callable|None = None,
+            batch_preprocess_fn: Callable|None = None,
             silent: bool = False
         ):
         self.model = model
         self.valid_metrics = metrics
 
-        self.postprocess_fn = postprocess_fn
+        self.batch_process_fn = batch_preprocess_fn
 
         self.device = torch.device(device)
         self.silent = silent
@@ -54,25 +54,21 @@ class Valider:
         return scores
 
 
-    def one_epoch(self, valid_loader: DataLoader, name: str, batch_fn: Callable|None=None):
+    def one_epoch(self, valid_loader: DataLoader, name: str):
         old_seed = set_seed(0)
         self.set_eval()
         with torch.no_grad():
             for input, *other in tqdm(valid_loader, desc=name.capitalize(), dynamic_ncols=True, disable=self.silent):
+                # batch process
+                if self.batch_process_fn is not None:
+                    input, *other = self.batch_process_fn(input, *other)
+
                 # move input to device
                 input = input.to(self.device)
                 other = [item.to(self.device, non_blocking=True) for item in other if hasattr(item, 'to')]
 
-                # batch process
-                if batch_fn is not None:
-                    input, *other = batch_fn(input, *other)
-
                 # forward
                 output:Tensor = self.model(input)
-
-                # postprocess
-                if self.postprocess_fn is not None:
-                    output, *other = self.postprocess_fn(output, *other)
 
                 # compute and record score
                 self.valid_metrics.update(output, *other)

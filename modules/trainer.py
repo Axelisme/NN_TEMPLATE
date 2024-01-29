@@ -28,8 +28,8 @@ class Trainer:
             criterion: nn.Module,
             device: str,
             metrics: Optional[MetricCollection],
-            batch_process_fn: Callable|None = None,
-            postprocess_fn: Callable|None = None,
+            batch_preprocess_fn: Callable|None = None,
+            augment_fn: Callable|None = None,
             silent: bool = False,
             grad_acc_steps:int = 1,
         ):
@@ -43,8 +43,8 @@ class Trainer:
 
         self.loss_metrics = MeanMetric()
         self.metrics = metrics
-        self.batch_process_fn = batch_process_fn
-        self.postprocess_fn = postprocess_fn
+        self.batch_process_fn = batch_preprocess_fn
+        self.augment_fn = augment_fn
         self.silent = silent
         self.device = torch.device(device)
 
@@ -97,20 +97,20 @@ class Trainer:
         self.set_train()
         for steps, (input, *other) in enumerate(self.cycle_loader, start=1):
             try:
-                # move input and label to device
-                input = input.to(self.device)
-                other = [item.to(self.device, non_blocking=True) for item in other if hasattr(item, 'to')]
-
                 # batch process
                 if self.batch_process_fn is not None:
                     input, *other = self.batch_process_fn(input, *other)
 
+                # augment
+                if self.augment_fn is not None:
+                    input, *other = self.augment_fn(input, *other)
+
+                # move input and label to device
+                input = input.to(self.device)
+                other = [item.to(self.device, non_blocking=True) for item in other if hasattr(item, 'to')]
+
                 # forward
                 output:Tensor = self.model(input)
-
-                # postprocess
-                if self.postprocess_fn is not None:
-                    output, *other = self.postprocess_fn(output, *other)
 
                 # compute loss and record
                 loss:Tensor = self.criterion(output, *other)
@@ -150,20 +150,20 @@ class Trainer:
         self.set_train()
         for steps, (input, *other) in enumerate(self.train_loader, start=1):
             try:
-                # move input to device
-                input = input.to(self.device)
-                other = [item.to(self.device, non_blocking=True) for item in other if hasattr(item, 'to')]
-
                 # batch process
                 if self.batch_process_fn is not None:
                     input, *other = self.batch_process_fn(input, *other)
 
+                # augment
+                if self.augment_fn is not None:
+                    input, *other = self.augment_fn(input, *other)
+
+                # move input to device
+                input = input.to(self.device)
+                other = [item.to(self.device, non_blocking=True) for item in other if hasattr(item, 'to')]
+
                 # forward
                 output:Tensor = self.model(input)
-
-                # postprocess
-                if self.postprocess_fn is not None:
-                    output, *other = self.postprocess_fn(output, *other)
 
                 # compute loss and record
                 loss:Tensor = self.criterion(output, *other)

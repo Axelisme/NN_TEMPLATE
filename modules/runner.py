@@ -12,7 +12,7 @@ from tqdm.auto import tqdm
 from functools import partial
 
 from util.io import show
-from util.utility import init, create_instance
+from util.utility import init, import_instance, create_instance
 from modules.trainer import Trainer
 from modules.valider import Valider
 from modules.ckpt import CheckPointManager
@@ -84,61 +84,64 @@ class Runner:
 
 
     def _get_criterion(self):
-        loss_select = self.taskrc['arch']['loss']['select']
+        loss_select = self.taskrc['loss']['select']
         show(f"[Runner] Loss function: {loss_select}.")
-        return create_instance(self.taskrc['arch']['loss'][loss_select])
+        return create_instance(self.taskrc['loss'][loss_select])
 
 
     def _get_modules_for_train(self, parameters):
-        arch_conf = self.taskrc['arch']
-
         # select optimizer
-        optim_select = arch_conf['optimizer']['select']
+        optim_select = self.taskrc['optimizer']['select']
         show(f"[Runner] Optimizer: {optim_select}.")
-        optimizer = create_instance(arch_conf['optimizer'][optim_select], params=parameters)
+        optimizer = create_instance(self.taskrc['optimizer'][optim_select], params=parameters)
 
         # select scheduler
-        sched_select = arch_conf['scheduler']['select']
+        sched_select = self.taskrc['scheduler']['select']
         show(f"[Runner] Scheduler: {sched_select}.")
-        scheduler = create_instance(arch_conf['scheduler'][sched_select], optimizer=optimizer)
+        scheduler = create_instance(self.taskrc['scheduler'][sched_select], optimizer=optimizer)
 
         return optimizer, scheduler
 
 
     def _get_modules_for_eval(self, criterion = None):
-        arch_conf = self.taskrc['arch']
+        metric_conf = self.taskrc['metric']
 
         # select evaluator
         metrics = {}
-        for name in arch_conf['metric']['select']:
-            metrics[name] = create_instance(arch_conf['metric'][name])
+        for name in metric_conf['selects']:
+            metrics[name] = create_instance(metric_conf[name])
         loss_metric = LossScore(criterion) if criterion else None
 
         # show metrics
         if len(metrics) >= 0 or loss_metric:
             show("[Runner] Metrics:")
             for i, name in enumerate(metrics.keys(), start=1):
-                show(f"\t{i}. {name}")
+                show(f"\t\t{i}. {name}")
             if loss_metric:
-                show(f"\t{len(metrics.keys())+1}. {arch_conf['metric']['loss_name']}")
+                show(f"\t\t{len(metrics.keys())+1}. {metric_conf['loss_name']}")
         else:
             show("[Runner] No metrics.")
 
         return metrics, loss_metric
 
     @staticmethod
-    def _get_dataloader(datasets_conf:Dict, loader_conf:Dict, select:str):
-        dataset = loader_conf['dataset']
-        show(f"\t{select.capitalize()} dataset: {dataset}.")
-        dataset = create_instance(datasets_conf[dataset])
-        return DataLoader(dataset, **loader_conf['kwargs'])
+    def _get_dataset(datasets_conf:Dict, select:str):
+        dataset = datasets_conf[select]
+        return create_instance(dataset)
 
+    @staticmethod
+    def _get_dataloader(loader_conf:Dict, process_conf:Dict, select:str, dataset):
+        conf = loader_conf[select]
+        kw_instances = {}
+        if collate_fn := conf['collate_fn']:
+            kw_instances['collate_fn'] = Runner._get_process_fn(process_conf, collate_fn)
+        return DataLoader(dataset, **kw_instances, **conf['kwargs'])
 
-    def _get_process_fn(self, process_conf: Dict[str, Dict[str, Any]], select: str|None):
+    @staticmethod
+    def _get_process_fn(process_conf: Dict[str, Dict[str, Any]], select: str|None):
         if select:
             conf = process_conf[select]
-            module = import_module(conf['module'])
-            return partial(getattr(module, conf['name']), **conf['kwargs'])
+            return partial(import_instance(conf), **conf['kwargs'])
         return None
 
 
@@ -181,25 +184,48 @@ class Runner:
                 optimizer.load_state_dict(CheckPointManager.load_param(self.args.ckpt, 'optimizer'))
                 scheduler.load_state_dict(CheckPointManager.load_param(self.args.ckpt, 'scheduler'))
 
-        # prepare dataset and dataloader
+
         data_conf = self.taskrc['data']
         datasets_conf = data_conf['datasets']
         loader_conf = data_conf['dataloaders']
-        if len(data_conf['valid_selects']) != len(set(data_conf['valid_selects'])):
-            raise ValueError('Duplicate loaders in taskrc["data"]["valid_selects"]')
-
-        show("[Runner] Train dataset:")
-        train_select = data_conf['train_select']
-        train_loader = self._get_dataloader(datasets_conf, loader_conf[train_select], 'train')
-        show("[Runner] Valid dataset:")
-        valid_selects = data_conf['valid_selects']
-        valid_loaders = [self._get_dataloader(datasets_conf, loader_conf[select], select) for select in valid_selects]
-
-        # create batch processor and post processor
         process_conf = data_conf['process_fns']
-        train_batch_fn = self._get_process_fn(process_conf, loader_conf[train_select]['batch_process_fn'])
-        valid_batch_fns = [self._get_process_fn(process_conf, loader_conf[select]['batch_process_fn']) for select in valid_selects]
-        postprocess_fn = self._get_process_fn(process_conf, data_conf['postprocess_fn'])
+
+        # check and show dataset
+        train_select = data_conf['train_dataset']
+        valid_selects = data_conf['valid_datasets']
+        if len(valid_selects) != len(set(valid_selects)):
+            raise ValueError('Duplicate loaders in taskrc["data"]["valid_datasets"]')
+        show(f"[Runner] Train dataset: {train_select}.")
+        show("[Runner] Valid dataset:")
+        for select in valid_selects:
+            show(f"\t\t{select}")
+        # create dataset
+        train_dataset = self._get_dataset(datasets_conf, train_select)
+        valid_datasets = [self._get_dataset(datasets_conf, select) for select in valid_selects]
+
+        # show dataloader
+        train_select = data_conf['train_dataloader']
+        valid_select = data_conf['valid_dataloader']
+        show(f"[Runner] Train dataloader: {train_select}.")
+        show(f"[Runner] Valid dataloader: {valid_select}.")
+        # create dataloader
+        train_loader = self._get_dataloader(loader_conf, process_conf, train_select, train_dataset)
+        valid_loaders = [self._get_dataloader(loader_conf, process_conf, valid_select, valid_dataset) for valid_dataset in valid_datasets]
+
+        # batch preprocess function
+        batch_preprocess_fn = None
+        if data_conf['batch_preprocess']:
+            batch_preprocess_fn = data_conf['batch_preprocess_fn']
+            show(f"[Runner] Preprocess batch with {batch_preprocess_fn}.")
+            batch_preprocess_fn = self._get_process_fn(process_conf, batch_preprocess_fn)
+
+        # augment batch_fn
+        augment_fn = None
+        if data_conf['augment']:
+            augment_fn = data_conf['augment_fn']
+            show(f"[Runner] Augment data with {augment_fn}.")
+            augment_fn = self._get_process_fn(process_conf, augment_fn)
+
 
         # create checkpoint manager if needed
         if not self.args.disable_save:
@@ -255,7 +281,7 @@ class Runner:
 
         # create trainer and valider
         runner_conf = self.taskrc['runner']
-        metric_conf = self.taskrc['arch']['metric']
+        metric_conf = self.taskrc['metric']
         trainer = Trainer(
             model=model,
             train_loader=train_loader,
@@ -264,8 +290,8 @@ class Runner:
             criterion=criterion,
             device=self.args.device,
             metrics=MetricCollection(metrics) if metric_conf['apply_on_train'] else None,
-            batch_process_fn=train_batch_fn,
-            postprocess_fn=postprocess_fn,
+            batch_preprocess_fn=batch_preprocess_fn,
+            augment_fn=augment_fn,
             silent=self.args.silent,
             **runner_conf['trainer_kwargs']
         )
@@ -277,7 +303,7 @@ class Runner:
             model=model,
             metrics=MetricCollection(valider_metrics),
             device=self.args.device,
-            postprocess_fn=postprocess_fn,
+            batch_preprocess_fn=batch_preprocess_fn,
             silent=self.args.silent,
             **runner_conf['valider_kwargs']
         )
@@ -345,13 +371,13 @@ class Runner:
                 if print_slash:
                     show('-' * 50)
                 current_results = {}
-                for name, valid_loader, batch_fn in zip(data_conf['valid_selects'], valid_loaders, valid_batch_fns):
+                for name, valid_loader in zip(valid_selects, valid_loaders):
                     # free gpu cache
                     if 'cuda' in self.args.device:
                         with torch.cuda.device(self.args.device):
                             torch.cuda.empty_cache()
                     # validate a epoch
-                    valider.one_epoch(valid_loader, name, batch_fn)
+                    valider.one_epoch(valid_loader, name)
                     current_result = valider.pop_result()
                     current_results[name] = current_result
                     if self.args.WandB: # log valid result to wandb
@@ -401,19 +427,44 @@ class Runner:
 
         # load models
         model = self._get_model()
-        if self.taskrc['arch']['metric']['use_loss']:
+        if self.taskrc['metric']['use_loss']:
             metrics, loss_metrics = self._get_modules_for_eval(self._get_criterion())
-            metrics[self.taskrc['arch']['metric']['loss_name']] = loss_metrics
+            metrics[self.taskrc['metric']['loss_name']] = loss_metrics
         else:
             metrics, _ = self._get_modules_for_eval()
 
         # load model from checkpoint if have
         model.load_state_dict(CheckPointManager.load_param(self.args.ckpt, 'model'))
 
-        # prepare dataset and dataloader
-        loader_conf = self.taskrc['data']['dataloaders']
+
+        data_conf = self.taskrc['data']
+        datasets_conf = data_conf['datasets']
+        loader_conf = data_conf['dataloaders']
+        process_conf = data_conf['process_fns']
+
+        # check and show dataset
+        valid_selects = self.args.valid_datasets
+        if len(valid_selects) != len(set(valid_selects)):
+            raise ValueError('Duplicate loaders in taskrc["data"]["valid_datasets"]')
         show("[Runner] Valid dataset:")
-        valid_loaders = [self._get_dataloader(self.taskrc['data']['datasets'], loader_conf[name], name) for name in self.args.valid_loaders]
+        for select in valid_selects:
+            show(f"\t\t{select}")
+        # create dataset
+        valid_datasets = [self._get_dataset(datasets_conf, select) for select in valid_selects]
+
+        # show dataloader
+        valid_select = self.args.valid_dataloader or data_conf['valid_dataloader']
+        show(f"[Runner] Valid dataloader: {valid_select}.")
+        # create dataloader
+        valid_loaders = [self._get_dataloader(loader_conf, process_conf, valid_select, valid_dataset) for valid_dataset in valid_datasets]
+
+        # batch preprocess function
+        batch_preprocess_fn = None
+        if data_conf['batch_preprocess']:
+            batch_preprocess_fn = data_conf['batch_preprocess_fn']
+            show(f"[Runner] Preprocess batch with {batch_preprocess_fn}.")
+            batch_preprocess_fn = self._get_process_fn(process_conf, batch_preprocess_fn)
+
 
         # create valider
         runner_conf = self.taskrc['runner']
@@ -421,6 +472,7 @@ class Runner:
             model=model,
             metrics=MetricCollection(metrics),
             device=self.args.device,
+            batch_preprocess_fn=batch_preprocess_fn,
             silent=self.args.silent,
             **runner_conf['valider_kwargs']
         )
@@ -429,7 +481,7 @@ class Runner:
         show("[Runner] Start evaluating.")
         show('-' * 50)
         current_results = {}
-        for name, valid_loader in zip(self.args.valid_loaders, valid_loaders):
+        for name, valid_loader in zip(self.args.valid_datasets, valid_loaders):
             # validate a epoch
             valider.one_epoch(valid_loader, name)
             # show result
