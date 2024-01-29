@@ -12,11 +12,13 @@ class TemplateModel(nn.Module):
         super(TemplateModel, self).__init__()
 
         self.fn1 = nn.Linear(input_size, hidden_size)
+        self.fni = nn.ReLU()
         self.fn2 = nn.Linear(hidden_size, num_classes)
 
     def forward(self, x:Tensor) -> Tensor:
         """Forward a batch of data through the model."""
         x = self.fn1(x)
+        x = self.fni(x)
         x = self.fn2(x)
         return x
 

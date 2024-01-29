@@ -15,6 +15,7 @@ from torchmetrics import MeanMetric, MetricCollection
 from torch.optim.lr_scheduler import _LRScheduler
 
 from util.datatools import cycle_iter
+from util.io import show
 
 
 class Trainer:
@@ -95,33 +96,44 @@ class Trainer:
     def one_step(self):
         self.set_train()
         for steps, (input, *other) in enumerate(self.cycle_loader, start=1):
-            # move input and label to device
-            input = input.to(self.device)
-            other = [item.to(self.device, non_blocking=True) for item in other if hasattr(item, 'to')]
+            try:
+                # move input and label to device
+                input = input.to(self.device)
+                other = [item.to(self.device, non_blocking=True) for item in other if hasattr(item, 'to')]
 
-            # batch process
-            if self.batch_process_fn is not None:
-                input, *other = self.batch_process_fn(input, *other)
+                # batch process
+                if self.batch_process_fn is not None:
+                    input, *other = self.batch_process_fn(input, *other)
 
-            # forward
-            output:Tensor = self.model(input)
+                # forward
+                output:Tensor = self.model(input)
 
-            # postprocess
-            if self.postprocess_fn is not None:
-                output, *other = self.postprocess_fn(output, *other)
+                # postprocess
+                if self.postprocess_fn is not None:
+                    output, *other = self.postprocess_fn(output, *other)
 
-            # compute loss and record
-            loss:Tensor = self.criterion(output, *other)
-            self.loss_metrics.update(loss)
+                # compute loss and record
+                loss:Tensor = self.criterion(output, *other)
+                self.loss_metrics.update(loss)
 
-            # backward
-            (loss / self.grad_acc_steps).backward()
-            del loss
+                # backward
+                (loss / self.grad_acc_steps).backward()
+                del loss
 
-            # compute metrics if have
-            if self.metrics is not None:
-                self.metrics.update(output, *other)
-            del output, other
+                # compute metrics if have
+                if self.metrics is not None:
+                    self.metrics.update(output, *other)
+                del output, other
+
+            except RuntimeError as e:
+                if 'CUDA out of memory' in str(e):
+                    show('[Trainer] WARNING: CUDA out of memory, skip this batch')
+                    with torch.cuda.device(self.device):
+                        torch.cuda.empty_cache()
+                    self.optimizer.zero_grad()
+                    continue
+                else:
+                    raise e
 
             # update parameters
             if steps >= self.grad_acc_steps:
@@ -137,34 +149,46 @@ class Trainer:
     def one_epoch(self):
         self.set_train()
         for steps, (input, *other) in enumerate(self.train_loader, start=1):
-            # move input to device
-            input = input.to(self.device)
-            other = [item.to(self.device, non_blocking=True) for item in other if hasattr(item, 'to')]
+            try:
+                # move input to device
+                input = input.to(self.device)
+                other = [item.to(self.device, non_blocking=True) for item in other if hasattr(item, 'to')]
 
-            # batch process
-            if self.batch_process_fn is not None:
-                input, *other = self.batch_process_fn(input, *other)
+                # batch process
+                if self.batch_process_fn is not None:
+                    input, *other = self.batch_process_fn(input, *other)
 
-            # forward
-            output:Tensor = self.model(input)
+                # forward
+                output:Tensor = self.model(input)
 
-            # postprocess
-            if self.postprocess_fn is not None:
-                output, *other = self.postprocess_fn(output, *other)
+                # postprocess
+                if self.postprocess_fn is not None:
+                    output, *other = self.postprocess_fn(output, *other)
 
-            # compute loss and record
-            loss:Tensor = self.criterion(output, *other)
-            self.loss_metrics.update(loss)
-            del input
+                # compute loss and record
+                loss:Tensor = self.criterion(output, *other)
+                self.loss_metrics.update(loss)
+                del input
 
-            # compute metrics if have
-            if self.metrics is not None:
-                self.metrics.update(output, *other)
-            del output, other
+                # compute metrics if have
+                if self.metrics is not None:
+                    self.metrics.update(output, *other)
+                del output, other
 
-            # backward
-            (loss / self.grad_acc_steps).backward()
-            del loss
+                # backward
+                (loss / self.grad_acc_steps).backward()
+                del loss
+
+            except RuntimeError as e:
+                if 'CUDA out of memory' in str(e):
+                    show('[Trainer] WARNING: CUDA out of memory, skip this batch')
+                    with torch.cuda.device(self.device):
+                        torch.cuda.empty_cache()
+                    self.optimizer.zero_grad()
+                    continue
+                else:
+                    raise e
+
 
             # update parameters
             if steps % self.grad_acc_steps == 0 or steps == len(self.train_loader):
