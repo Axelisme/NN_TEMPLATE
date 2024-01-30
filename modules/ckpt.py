@@ -4,7 +4,7 @@ define a class to manage the checkpoint
 import os
 import yaml
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 
 import torch
 from torch import Tensor
@@ -13,18 +13,37 @@ from util.io import show
 
 
 class CheckPointManager:
-    def __init__(self, ckpt_dir: str, check_metrics: list = [], keep_num: int = -1):
+    def __init__(
+            self,
+            ckpt_dir: str,
+            check_metrics: list,
+            check_datasets: list,
+            keep_num: int = -1,
+            metric_compare_first: bool = True
+        ):
         show(f"[CheckpointManager] Using {ckpt_dir} as checkpoint directory")
         self.ckpt_dir = Path(ckpt_dir)
         self.ckpt_dir.mkdir(parents=True, exist_ok=True)
 
-        if len(check_metrics) >= 0:
-            show("[CheckpointManager] Save policy:")
-            for i, metric in enumerate(check_metrics, start=1):
-                show(f"\t{i}. Name: {metric['name']:>10},\tMod: {metric['mod']}")
+        # check
+        assert len(check_metrics) > 0, "check_metrics must be non-empty"
+        assert len(check_datasets) > 0, "check_datasets must be non-empty"
+
+        # pair the check metrics and datasets
+        self.pair_metrics = []
+        if metric_compare_first:
+            for check_metric in check_metrics:
+                for check_dataset in check_datasets:
+                    self.pair_metrics.append((check_metric, check_dataset))
         else:
-            show("[CheckpointManager] Save policy: ALAWYS NOT SAVE")
-        self.check_metrics = check_metrics
+            for check_dataset in check_datasets:
+                for check_metric in check_metrics:
+                    self.pair_metrics.append((check_metric, check_dataset))
+
+        # show the check pairs
+        show(f"[CheckpointManager] Checkpoint save policy:")
+        for i, (metric, dataset) in enumerate(self.pair_metrics, start=1):
+            show(f"\t{i}. {dataset}-{metric['name']}")
 
         if keep_num == -1:
             show(f"[CheckpointManager] Keep all checkpoints in ckpt_dir")
@@ -36,24 +55,23 @@ class CheckPointManager:
 
 
     def check_better(self, current_results: Dict[str, Dict[str, float]], best_results: Dict[str, Dict[str, float]]):
-        for check_key, current_result in current_results.items():
-            if best_result := best_results.get(check_key):
-                for check_metric in self.check_metrics:
-                    name = check_metric['name']
-                    mod = check_metric['mod']
-                    if current_metric := current_result.get(name):
-                        if best_metric := best_result.get(name):
-                            if current_metric == best_metric:
-                                continue
-                            return mod == 'max' and current_metric > best_metric or \
-                                    mod == 'min' and current_metric < best_metric
-                        else:
-                            return True
-                    else:
+        for metric, dataset in self.pair_metrics:
+            name = metric['name']
+            mod = metric['mod']
+            if current_metric := current_results.get(dataset, {}).get(name):
+                if best_metric := best_results.get(dataset, {}).get(name):
+                    if current_metric == best_metric:
                         continue
+                    elif mod == 'max':
+                        return current_metric > best_metric
+                    elif mod == 'min':
+                        return current_metric < best_metric
+                    else:
+                        raise ValueError(f"Unknown mod {mod}")
+                else:
+                    return True
             else:
-                return True
-        return False
+                raise ValueError(f"Metric {name} not found in current_results")
 
     @classmethod
     def dump_config(cls, save_conf: Dict, path: str, overwrite: bool = False):

@@ -3,7 +3,6 @@
 
 from typing import Dict, Optional, Callable
 from tqdm import tqdm
-from argparse import Namespace
 
 
 import torch
@@ -43,6 +42,7 @@ class Trainer:
 
         self.loss_metrics = MeanMetric()
         self.metrics = metrics
+        assert 'loss' not in self.metrics.keys(), 'loss is a reserved key for trainer, please rename your metrics'
         self.batch_process_fn = batch_preprocess_fn
         self.augment_fn = augment_fn
         self.silent = silent
@@ -84,47 +84,50 @@ class Trainer:
 
     def pop_result(self) -> Dict[str, Tensor]:
         '''get the average loss of training and reset the statistic of loss'''
-        results = {}
+        results = {'loss': self.loss_metrics.compute()}
         if self.metrics is not None:
             results.update(self.metrics.compute())
             self.metrics.reset()
-        results.update({'train_loss': self.loss_metrics.compute()})
         self.loss_metrics.reset()
         return results
+
+
+    def forward_model(self, input, *other):
+        # augment
+        if self.augment_fn is not None:
+            input, *other = self.augment_fn(input, *other)
+
+        # batch process
+        if self.batch_process_fn is not None:
+            input, *other = self.batch_process_fn(input, *other)
+
+        # move input and label to device
+        input = input.to(self.device)
+        other = [item.to(self.device, non_blocking=True) for item in other if hasattr(item, 'to')]
+
+        # forward
+        output:Tensor = self.model(input)
+
+        # compute loss and record
+        loss:Tensor = self.criterion(output, *other)
+        self.loss_metrics.update(loss)
+
+        # backward
+        (loss / self.grad_acc_steps).backward()
+        del loss
+
+        # compute metrics if have
+        if self.metrics is not None:
+            self.metrics.update(output, *other)
+        del output
 
 
     def one_step(self):
         self.set_train()
         for steps, (input, *other) in enumerate(self.cycle_loader, start=1):
             try:
-                # batch process
-                if self.batch_process_fn is not None:
-                    input, *other = self.batch_process_fn(input, *other)
-
-                # augment
-                if self.augment_fn is not None:
-                    input, *other = self.augment_fn(input, *other)
-
-                # move input and label to device
-                input = input.to(self.device)
-                other = [item.to(self.device, non_blocking=True) for item in other if hasattr(item, 'to')]
-
-                # forward
-                output:Tensor = self.model(input)
-
-                # compute loss and record
-                loss:Tensor = self.criterion(output, *other)
-                self.loss_metrics.update(loss)
-
-                # backward
-                (loss / self.grad_acc_steps).backward()
-                del loss
-
-                # compute metrics if have
-                if self.metrics is not None:
-                    self.metrics.update(output, *other)
-                del output, other
-
+                self.forward_model(input, *other)
+                del input, other
             except RuntimeError as e:
                 if 'CUDA out of memory' in str(e):
                     show('[Trainer] WARNING: CUDA out of memory, skip this batch')
@@ -150,35 +153,8 @@ class Trainer:
         self.set_train()
         for steps, (input, *other) in enumerate(self.train_loader, start=1):
             try:
-                # batch process
-                if self.batch_process_fn is not None:
-                    input, *other = self.batch_process_fn(input, *other)
-
-                # augment
-                if self.augment_fn is not None:
-                    input, *other = self.augment_fn(input, *other)
-
-                # move input to device
-                input = input.to(self.device)
-                other = [item.to(self.device, non_blocking=True) for item in other if hasattr(item, 'to')]
-
-                # forward
-                output:Tensor = self.model(input)
-
-                # compute loss and record
-                loss:Tensor = self.criterion(output, *other)
-                self.loss_metrics.update(loss)
-                del input
-
-                # compute metrics if have
-                if self.metrics is not None:
-                    self.metrics.update(output, *other)
-                del output, other
-
-                # backward
-                (loss / self.grad_acc_steps).backward()
-                del loss
-
+                self.forward_model(input, *other)
+                del input, other
             except RuntimeError as e:
                 if 'CUDA out of memory' in str(e):
                     show('[Trainer] WARNING: CUDA out of memory, skip this batch')
@@ -188,7 +164,6 @@ class Trainer:
                     continue
                 else:
                     raise e
-
 
             # update parameters
             if steps % self.grad_acc_steps == 0 or steps == len(self.train_loader):

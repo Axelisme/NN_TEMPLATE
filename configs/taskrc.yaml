@@ -1,6 +1,6 @@
 runner: &Runner
   step_mod: 'grad' # 'epoch' or 'grad'
-  total_steps: 5000
+  total_steps: 2000
   log_freq: 100
   valid_freq: 1000
   save_freq: 500
@@ -34,7 +34,7 @@ loss:
 
 metric:
   use_loss: True
-  loss_name: &Loss_name 'val_loss'
+  loss_name: &Loss_name 'loss'
   apply_on_train: True
   selects:
     - &Acc 'acc'
@@ -49,13 +49,15 @@ ckpt:
   check_metrics:
     - {name: *Acc, mod: 'max'}
     - {name: *Loss_name, mod: 'min'}
-  keep_num: 3
+  check_datasets: ~ # None implies all datasets
+  keep_num: 3       # -1 implies keep all
+  metric_compare_first: False  # compare metrics first, else compare datasets first
 
 data:
-  train_dataset: 'train_hdf5'                 # select train dataset
-  valid_datasets: ['devel_hdf5', 'test_hdf5'] # select valid datasets
+  train_dataset: 'train'                 # select train dataset
+  valid_datasets: ['devel', 'test']      # select valid datasets
   batch_preprocess: False # apply to all datasets
-  augment: True           # only apply on train dataset, after batch_preprocess
+  augment: True           # only apply on train dataset, before batch_preprocess
 
   train_dataloader: 'trainloader'
   valid_dataloader: 'validloader'
@@ -63,17 +65,17 @@ data:
   augment_fn: 'batch_augment_fn'
 
   datasets:
-    train_hdf5:
+    train:
       name: 'HDF5DataSet'
       module: 'custom.dataset.hdf5_dataset'
       kwargs:
         dataset_path: './data/processed/template/train.h5'
-    devel_hdf5:
+    devel:
       name: 'HDF5DataSet'
       module: 'custom.dataset.hdf5_dataset'
       kwargs:
         dataset_path: './data/processed/template/devel.h5'
-    test_hdf5:
+    test:
       name: 'HDF5DataSet'
       module: 'custom.dataset.hdf5_dataset'
       kwargs:

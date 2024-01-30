@@ -116,9 +116,9 @@ class Runner:
         if len(metrics) >= 0 or loss_metric:
             show("[Runner] Metrics:")
             for i, name in enumerate(metrics.keys(), start=1):
-                show(f"\t\t{i}. {name}")
+                show(f"\t{i}. {name}")
             if loss_metric:
-                show(f"\t\t{len(metrics.keys())+1}. {metric_conf['loss_name']}")
+                show(f"\t{len(metrics.keys())+1}. {metric_conf['loss_name']}")
         else:
             show("[Runner] No metrics.")
 
@@ -197,8 +197,8 @@ class Runner:
             raise ValueError('Duplicate loaders in taskrc["data"]["valid_datasets"]')
         show(f"[Runner] Train dataset: {train_select}.")
         show("[Runner] Valid dataset:")
-        for select in valid_selects:
-            show(f"\t\t{select}")
+        for i, select in enumerate(valid_selects, start=1):
+            show(f"\t{i}. {select}")
         # create dataset
         train_dataset = self._get_dataset(datasets_conf, train_select)
         valid_datasets = [self._get_dataset(datasets_conf, select) for select in valid_selects]
@@ -229,7 +229,10 @@ class Runner:
 
         # create checkpoint manager if needed
         if not self.args.disable_save:
-            ckpt_manager = CheckPointManager(self.args.ckpt_dir, **self.taskrc['ckpt'])
+            ckpt_conf = self.taskrc['ckpt']
+            if ckpt_conf['check_datasets'] is None:
+                ckpt_conf['check_datasets'] = valid_selects
+            ckpt_manager = CheckPointManager(self.args.ckpt_dir, **ckpt_conf)
 
         # init status from checkpoint or from scratch
         if self.args.resume: # resume from checkpoint
@@ -237,7 +240,7 @@ class Runner:
             start_step = meta_conf['step']
             best_step = meta_conf['best_step']
             best_results = meta_conf['best_results']
-            run_id = meta_conf.get('run_id')
+            run_id = meta_conf['run_id']
             if self.args.WandB:
                 wandb_conf = self.taskrc['WandB']
                 if run_id is None: # generate run_id if not have
@@ -447,8 +450,8 @@ class Runner:
         if len(valid_selects) != len(set(valid_selects)):
             raise ValueError('Duplicate loaders in taskrc["data"]["valid_datasets"]')
         show("[Runner] Valid dataset:")
-        for select in valid_selects:
-            show(f"\t\t{select}")
+        for i, select in enumerate(valid_selects, start=1):
+            show(f"\t{i}. {select}")
         # create dataset
         valid_datasets = [self._get_dataset(datasets_conf, select) for select in valid_selects]
 

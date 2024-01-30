@@ -48,7 +48,8 @@ def get_default_args(modelrc: str, taskrc: str) -> Namespace:
         'WandB' : True,
         'disable_save' : True,
         'overwrite' : False,
-        'valid_loaders' : None
+        'valid_datasets' : None,
+        'valid_dataloader': None,
     }
 
     default_args = Namespace(**default_args)

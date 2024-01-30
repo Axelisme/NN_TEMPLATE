@@ -27,7 +27,7 @@ class Valider:
         self.model = model
         self.valid_metrics = metrics
 
-        self.batch_process_fn = batch_preprocess_fn
+        self.batch_preprocess_fn = batch_preprocess_fn
 
         self.device = torch.device(device)
         self.silent = silent
@@ -60,8 +60,8 @@ class Valider:
         with torch.no_grad():
             for input, *other in tqdm(valid_loader, desc=name.capitalize(), dynamic_ncols=True, disable=self.silent):
                 # batch process
-                if self.batch_process_fn is not None:
-                    input, *other = self.batch_process_fn(input, *other)
+                if self.batch_preprocess_fn is not None:
+                    input, *other = self.batch_preprocess_fn(input, *other)
 
                 # move input to device
                 input = input.to(self.device)
